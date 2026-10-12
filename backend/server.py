@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from src.config.database import college_engine, SessionLocal
 from src.config.base import Base
 from src.utils.seed import seed_roles
+from src.utils.schema_sync import sync_schema
 import src.models
 from src.modules.auth.auth_routes import router as auth_router
 from src.modules.admin.admin_routes import router as admin_router
@@ -34,6 +35,9 @@ app.add_middleware(
 async def startup():
     async with college_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        added = await sync_schema(conn)
+    if added:
+        print(f"schema sync: added {len(added)} column(s) -> {', '.join(added)}")
     async with SessionLocal() as session:
         await seed_roles(session)
 
