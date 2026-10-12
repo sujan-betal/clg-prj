@@ -28,6 +28,9 @@ export default function Departments() {
             <h3 className="font-display text-lg font-bold text-maroon">{d.name}</h3>
             <p className="text-xs text-ink/40">{d.code}</p>
             <p className="mt-2 text-sm text-ink/60">{d.description || "-"}</p>
+            <p className="mt-3 text-xs font-semibold text-maroon/70">
+              {d.courses_count ?? 0} programs
+            </p>
           </div>
         ))}
       </section>

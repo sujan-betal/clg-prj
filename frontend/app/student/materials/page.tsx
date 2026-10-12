@@ -36,7 +36,7 @@ export default function StudentMaterials() {
             ) : rows.map((r, i) => (
               <tr key={r.id ?? i} className={i % 2 ? "bg-cream/60" : ""}>
                 <td className="px-4 py-3">{r.title}</td>
-                <td className="px-4 py-3">{r.subject_id}</td>
+                <td className="px-4 py-3">{r.subject_name || `Subject ${r.subject_id}`}</td>
                 <td className="px-4 py-3">{r.file_type}</td>
                 <td className="px-4 py-3">{r.file_url ? <a href={r.file_url} className="text-maroon underline">Open</a> : "-"}</td>
               </tr>

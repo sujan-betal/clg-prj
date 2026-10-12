@@ -26,13 +26,13 @@ export default function AdminFees() {
     api.adminCourses().then((res) => res.success && setCourses(res.data || []));
   }, []);
 
-  const courseName = (id: number) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
+  const courseName = (id: string) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
     const res = await api.adminCreateFee({
-      course_id: Number(form.course_id),
+      course_id: form.course_id,
       head: form.head,
       amount: Number(form.amount),
       due_date: form.due_date || undefined,

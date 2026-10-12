@@ -9,13 +9,14 @@ is proven end to end and the frontend will have something to display.
 """
 
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import date, timedelta
 
-BASE = "http://127.0.0.1:8010"
+BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 ADMIN_PW = "Admin@1234"
 NEW_USER_PW = "Temp@1234"
 

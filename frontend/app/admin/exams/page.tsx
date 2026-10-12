@@ -13,7 +13,7 @@ export default function AdminExams() {
   usePermissionRefresh();
   const canManage = hasPermission("EXAM_MANAGE");
 
-  const courseName = (id: number) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
+  const courseName = (id: string) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
 
   function load() {
     setLoading(true);
@@ -33,7 +33,7 @@ export default function AdminExams() {
     setMessage("");
     const res = await api.adminCreateExam({
       name: form.name,
-      course_id: form.course_id ? Number(form.course_id) : undefined,
+      course_id: form.course_id || undefined,
       semester: form.semester ? Number(form.semester) : undefined,
       start_date: form.start_date || undefined,
       is_published: Number(form.is_published),

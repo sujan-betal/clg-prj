@@ -8,9 +8,8 @@ from sqlalchemy import (
     UniqueConstraint
 )
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 
-from src.config.base import Base
+from src.config.base import Base, GUID, new_uuid
 
 
 class Attendance(Base):
@@ -24,6 +23,14 @@ class Attendance(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     student_id = Column(
@@ -70,6 +77,14 @@ class Exam(Base):
         index=True
     )
 
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
+    )
+
     name = Column(
         String(150),
         nullable=False
@@ -110,6 +125,14 @@ class Marks(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     student_id = Column(

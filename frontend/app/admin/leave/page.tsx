@@ -20,7 +20,7 @@ export default function AdminLeave() {
 
   useEffect(load, []);
 
-  async function setStatus(id: number, status: string) {
+  async function setStatus(id: string, status: string) {
     const res = await api.adminUpdateLeave(id, status);
     if (res.success) load();
   }

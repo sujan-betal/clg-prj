@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class ContactSchema(BaseModel):
@@ -12,4 +14,4 @@ class AdmissionApplySchema(BaseModel):
     applicant_name: str = Field(..., min_length=1)
     email: str = Field(..., min_length=3)
     phone: str = Field(..., min_length=5)
-    course_id: Optional[int] = None
+    course_id: Optional[UUID] = None

@@ -35,8 +35,8 @@ export default function TeacherAttendance() {
     setMessage("");
     const res = await api.teacherMarkAttendance([
       {
-        student_id: Number(form.student_id),
-        subject_id: Number(form.subject_id),
+        student_id: form.student_id,
+        subject_id: form.subject_id,
         date: form.date,
         status: form.status,
       },

@@ -159,16 +159,16 @@ export const api = {
     role?: string;
     status?: string;
     designation?: string;
-    department_id?: number;
+    department_id?: string;
     permissions?: string[];
   }) => apiFetch("/api/admin/users", { method: "POST", body: payload }),
   adminPermissions: () => apiFetch("/api/admin/permission-names"),
   adminRoles: () => apiFetch("/api/admin/roles"),
   adminCreateRole: (payload: { name: string; description?: string; is_admin?: boolean }) =>
     apiFetch("/api/admin/roles", { method: "POST", body: payload }),
-  adminUpdateRole: (id: number, payload: { description?: string; is_admin?: boolean }) =>
+  adminUpdateRole: (id: string, payload: { description?: string; is_admin?: boolean }) =>
     apiFetch(`/api/admin/roles/${id}`, { method: "PUT", body: payload }),
-  adminDeleteRole: (id: number) => apiFetch(`/api/admin/roles/${id}`, { method: "DELETE" }),
+  adminDeleteRole: (id: string) => apiFetch(`/api/admin/roles/${id}`, { method: "DELETE" }),
   adminUserPermissions: (userid: string) => apiFetch(`/api/admin/users/${userid}/permissions`),
   adminSetUserPermissions: (userid: string, permissions: string[]) =>
     apiFetch(`/api/admin/users/${userid}/permissions`, { method: "PUT", body: { permissions } }),
@@ -186,7 +186,7 @@ export const api = {
   studentNotices: () => apiFetch("/api/student/notices"),
 
   teacherProfile: () => apiFetch("/api/teacher/profile"),
-  teacherUpdateProfile: (payload: { designation?: string; department_id?: number }) =>
+  teacherUpdateProfile: (payload: { designation?: string; department_id?: string }) =>
     apiFetch("/api/teacher/profile", { method: "PUT", body: payload }),
   teacherSubjects: () => apiFetch("/api/teacher/subjects"),
   teacherPostNotice: (payload: { title: string; content: string; audience?: string }) =>
@@ -198,17 +198,18 @@ export const api = {
   studentCertificates: () => apiFetch("/api/student/certificates"),
 
   teacherStudents: () => apiFetch("/api/teacher/students"),
+  teacherExams: () => apiFetch("/api/teacher/exams"),
 teacherAttendance: () => apiFetch("/api/teacher/attendance"),
-  teacherMarkAttendance: (records: { student_id: number; subject_id: number; date: string; status: string }[]) =>
+  teacherMarkAttendance: (records: { student_id: string; subject_id: string; date: string; status: string }[]) =>
     apiFetch("/api/teacher/attendance", { method: "POST", body: { records } }),
   teacherMarks: () => apiFetch("/api/teacher/marks"),
-  teacherAddMarks: (payload: { student_id: number; exam_id: number; subject_id: number; marks_obtained: number; marks_total: number }) =>
+  teacherAddMarks: (payload: { student_id: string; exam_id: string; subject_id: string; marks_obtained: number; marks_total: number }) =>
     apiFetch("/api/teacher/marks", { method: "POST", body: payload }),
   teacherMaterials: () => apiFetch("/api/teacher/materials"),
-  teacherAddMaterial: (payload: { title: string; subject_id: number; file_url?: string; file_type?: string; file_size?: number }) =>
+  teacherAddMaterial: (payload: { title: string; subject_id: string; file_url?: string; file_type?: string; file_size?: number }) =>
     apiFetch("/api/teacher/materials", { method: "POST", body: payload }),
   teacherAssignments: () => apiFetch("/api/teacher/assignments"),
-  teacherAddAssignment: (payload: { title: string; description?: string; subject_id: number; section?: string; due_date?: string }) =>
+  teacherAddAssignment: (payload: { title: string; description?: string; subject_id: string; section?: string; due_date?: string }) =>
     apiFetch("/api/teacher/assignments", { method: "POST", body: payload }),
   teacherLeave: () => apiFetch("/api/teacher/leave"),
   teacherApplyLeave: (payload: { from_date: string; to_date: string; reason?: string }) =>
@@ -218,21 +219,21 @@ teacherAttendance: () => apiFetch("/api/teacher/attendance"),
   adminCreateDepartment: (payload: { name: string; code: string; description?: string }) =>
     apiFetch("/api/admin/departments", { method: "POST", body: payload }),
   adminCourses: () => apiFetch("/api/admin/courses"),
-  adminCreateCourse: (payload: { department_id: number; name: string; code: string; duration_years?: number; total_seats?: number; annual_fee?: number }) =>
+  adminCreateCourse: (payload: { department_id: string; name: string; code: string; duration_years?: number; total_seats?: number; annual_fee?: number }) =>
     apiFetch("/api/admin/courses", { method: "POST", body: payload }),
   adminAdmissions: () => apiFetch("/api/admin/admissions"),
-  adminUpdateAdmission: (id: number, status: string) =>
+  adminUpdateAdmission: (id: string, status: string) =>
     apiFetch(`/api/admin/admissions/${id}/status`, { method: "PUT", body: { status } }),
   adminFees: () => apiFetch("/api/admin/fees"),
-  adminCreateFee: (payload: { course_id: number; head: string; amount: number; due_date?: string }) =>
+  adminCreateFee: (payload: { course_id: string; head: string; amount: number; due_date?: string }) =>
     apiFetch("/api/admin/fees", { method: "POST", body: payload }),
   adminExams: () => apiFetch("/api/admin/exams"),
-  adminCreateExam: (payload: { name: string; course_id?: number; semester?: number; start_date?: string; is_published?: number }) =>
+  adminCreateExam: (payload: { name: string; course_id?: string; semester?: number; start_date?: string; is_published?: number }) =>
     apiFetch("/api/admin/exams", { method: "POST", body: payload }),
   adminNotices: () => apiFetch("/api/admin/notices"),
   adminContent: () => apiFetch("/api/admin/content"),
   adminLeave: () => apiFetch("/api/admin/leave"),
-  adminUpdateLeave: (id: number, status: string) =>
+  adminUpdateLeave: (id: string, status: string) =>
     apiFetch(`/api/admin/leave/${id}/status`, { method: "PUT", body: { status } }),
   adminReports: () => apiFetch("/api/admin/reports"),
   adminAuditLogs: () => apiFetch("/api/admin/audit-logs"),
@@ -245,7 +246,7 @@ teacherAttendance: () => apiFetch("/api/teacher/attendance"),
   publicFaculty: () => apiFetch("/api/public/faculty", { auth: false }),
   publicEvents: () => apiFetch("/api/public/events", { auth: false }),
   publicGallery: () => apiFetch("/api/public/gallery", { auth: false }),
-  publicApply: (payload: { applicant_name: string; email: string; phone: string; course_id?: number }) =>
+  publicApply: (payload: { applicant_name: string; email: string; phone: string; course_id?: string }) =>
     apiFetch("/api/public/admissions", { method: "POST", body: payload, auth: false }),
   publicContact: (payload: { name: string; email: string; message: string }) =>
     apiFetch("/api/public/contact", { method: "POST", body: payload, auth: false }),

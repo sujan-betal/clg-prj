@@ -10,17 +10,28 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from src.config.base import Base
+from src.config.base import Base, GUID, new_uuid
 
 
 class Department(Base):
 
     __tablename__ = "departments"
 
+    # Internal surrogate key: fast integer joins, never leaves the server.
     id = Column(
         Integer,
         primary_key=True,
         index=True
+    )
+
+    # The identifier the API hands out and accepts. A UUID cannot be guessed
+    # or walked, so knowing one id reveals nothing about any other record.
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     name = Column(
@@ -56,6 +67,14 @@ class Course(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     department_id = Column(
@@ -106,6 +125,14 @@ class Subject(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     course_id = Column(

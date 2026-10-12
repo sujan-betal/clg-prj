@@ -46,13 +46,14 @@ async def notices(
 
 
 from typing import List, Optional
+from uuid import UUID
 from datetime import date as date_type, datetime as datetime_type
 from pydantic import BaseModel
 
 
 class AttendanceRecordSchema(BaseModel):
-    student_id: int
-    subject_id: int
+    student_id: UUID
+    subject_id: UUID
     date: date_type
     status: str = "PRESENT"
 
@@ -62,16 +63,16 @@ class AttendanceMarkSchema(BaseModel):
 
 
 class MarksAddSchema(BaseModel):
-    student_id: int
-    exam_id: int
-    subject_id: int
+    student_id: UUID
+    exam_id: UUID
+    subject_id: UUID
     marks_obtained: int = 0
     marks_total: int = 100
 
 
 class MaterialCreateSchema(BaseModel):
     title: str
-    subject_id: int
+    subject_id: UUID
     file_url: Optional[str] = None
     file_type: Optional[str] = None
     file_size: Optional[int] = 0
@@ -80,7 +81,7 @@ class MaterialCreateSchema(BaseModel):
 class AssignmentCreateSchema(BaseModel):
     title: str
     description: Optional[str] = None
-    subject_id: int
+    subject_id: UUID
     section: Optional[str] = None
     due_date: Optional[datetime_type] = None
 
@@ -94,6 +95,13 @@ class LeaveApplySchema(BaseModel):
 @router.get("/students")
 async def students(db: AsyncSession = Depends(get_db), user=Depends(teacher_only)):
     return await teacher_services.list_students(db, user)
+
+
+@router.get("/exams")
+async def exams(db: AsyncSession = Depends(get_db), user=Depends(teacher_only)):
+    """Exams for the courses this teacher teaches, so the marks form can
+    offer real names instead of asking the teacher to type an exam id."""
+    return await teacher_services.list_exams(db, user)
 
 
 @router.get("/attendance")

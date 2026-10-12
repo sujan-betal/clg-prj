@@ -38,8 +38,11 @@ export default function TeacherTimetable() {
               <tr><td colSpan={4} className="px-4 py-3">No subjects assigned.</td></tr>
             ) : rows.map((r, i) => (
               <tr key={i} className={i % 2 ? "bg-cream/60" : ""}>
-                <td className="px-4 py-3">{r.subject_id}</td>
-                <td className="px-4 py-3">{r.course_id}</td>
+                <td className="px-4 py-3">
+                  {r.subject_name || `Subject ${r.subject_id}`}
+                  <span className="ml-2 text-xs text-ink/40">{r.subject_code}</span>
+                </td>
+                <td className="px-4 py-3">{r.course_name || `Course ${r.course_id}`}</td>
                 <td className="px-4 py-3">{r.section}</td>
                 <td className="px-4 py-3">{r.academic_year || "-"}</td>
               </tr>

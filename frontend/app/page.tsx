@@ -8,11 +8,19 @@ export default function Home() {
   const [home, setHome] = useState<any>(null);
   const [notices, setNotices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.publicHome().then((res) => res.success && setHome(res.data));
-    api.publicNotices().then((res) => res.success && setNotices((res.data || []).slice(0, 4)));
-    api.publicEvents().then((res) => res.success && setEvents((res.data || []).slice(0, 4)));
+    Promise.all([
+      api.publicHome(),
+      api.publicNotices(),
+      api.publicEvents(),
+    ]).then(([homeRes, noticeRes, eventRes]) => {
+      if (homeRes.success) setHome(homeRes.data);
+      if (noticeRes.success) setNotices((noticeRes.data || []).slice(0, 4));
+      if (eventRes.success) setEvents((eventRes.data || []).slice(0, 4));
+      setLoading(false);
+    });
   }, []);
 
   const ticker = notices.length > 0
@@ -23,12 +31,8 @@ export default function Home() {
     { n: String(home?.stats?.students ?? "-"), l: "Students" },
     { n: String(home?.stats?.programs ?? "-"), l: "Programs" },
     { n: String(home?.stats?.faculty ?? "-"), l: "Faculty" },
-    { n: content_value(home, "established") ?? "-", l: "Est." },
+    { n: String(home?.established ?? "-"), l: "Est." },
   ];
-
-  function content_value(h: any, key: string) {
-    return h?.[key] ? String(h[key]) : null;
-  }
 
   return (
     <>
@@ -79,12 +83,21 @@ export default function Home() {
       {/* Stats */}
       <section className="dot-grid">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-14 md:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.l} className="rounded-2xl border-b-4 border-saffron bg-white p-5 text-center shadow-sm">
-              <p className="font-display text-4xl font-black text-maroon">{s.n}</p>
-              <p className="mt-1 text-sm tracking-widest text-ink/60">{s.l}</p>
-            </div>
-          ))}
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl border-b-4 border-saffron/30 bg-white p-5 text-center shadow-sm">
+                <p className="font-display text-4xl font-black text-ink/20">-</p>
+                <p className="mt-1 text-sm tracking-widest text-ink/40">Loading</p>
+              </div>
+            ))
+          ) : (
+            stats.map((s) => (
+              <div key={s.l} className="rounded-2xl border-b-4 border-saffron bg-white p-5 text-center shadow-sm">
+                <p className="font-display text-4xl font-black text-maroon">{s.n}</p>
+                <p className="mt-1 text-sm tracking-widest text-ink/60">{s.l}</p>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

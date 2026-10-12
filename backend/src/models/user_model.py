@@ -9,9 +9,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-import uuid
 
-from src.config.base import Base
+from src.config.base import Base, new_uuid
 
 
 class User(Base):
@@ -22,6 +21,17 @@ class User(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    # The identifier every other table points at, and the only user id the
+    # API exposes. A UUID rather than the sequential `id` above, so user ids
+    # cannot be walked by counting. It doubles as this table's public_id.
+    userid = Column(
+        String(36),
+        default=new_uuid,
+        server_default=text("gen_random_uuid()"),
+        unique=True,
+        nullable=False
     )
 
     username = Column(
@@ -70,14 +80,6 @@ class User(Base):
     reset_nonce = Column(
         String(64),
         nullable=True
-    )
-
-    userid = Column(
-        String(36),
-        default=lambda: str(uuid.uuid4()),
-        server_default=text("gen_random_uuid()"),
-        unique=True,
-        nullable=False
     )
 
     created_by = Column(

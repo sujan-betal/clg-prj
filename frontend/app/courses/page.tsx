@@ -33,11 +33,15 @@ export default function Courses() {
             key={c.id}
             className="rounded-2xl border border-ink/10 bg-white p-6 hover:-translate-y-1 hover:shadow-md transition"
           >
-            <h3 className="font-display text-xl font-bold text-maroon">{c.name}</h3>
+            <p className="text-xs font-semibold tracking-widest text-maroon/70">
+              {c.department_name || "General"}
+            </p>
+            <h3 className="mt-1 font-display text-xl font-bold text-maroon">{c.name}</h3>
             <p className="text-xs text-ink/40">{c.code}</p>
-            <div className="mt-4 flex gap-3 text-xs">
+            <div className="mt-4 flex flex-wrap gap-3 text-xs">
               <span className="rounded-full bg-cream px-3 py-1">{c.total_seats} seats</span>
               <span className="rounded-full bg-cream px-3 py-1">{c.duration_years} yrs</span>
+              <span className="rounded-full bg-cream px-3 py-1">{c.subjects_count ?? 0} subjects</span>
               <span className="rounded-full bg-saffron-soft px-3 py-1 font-semibold">Rs {c.annual_fee}</span>
             </div>
           </div>

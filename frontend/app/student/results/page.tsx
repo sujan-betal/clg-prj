@@ -25,18 +25,20 @@ export default function StudentResults() {
               <th className="px-4 py-3 text-left font-semibold">Exam</th>
               <th className="px-4 py-3 text-left font-semibold">Subject</th>
               <th className="px-4 py-3 text-left font-semibold">Marks</th>
+              <th className="px-4 py-3 text-left font-semibold">%</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={3} className="px-4 py-3">Loading...</td></tr>
+              <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={3} className="px-4 py-3">No marks available.</td></tr>
+              <tr><td colSpan={4} className="px-4 py-3">No marks available.</td></tr>
             ) : rows.map((r, i) => (
               <tr key={i} className={i % 2 ? "bg-cream/60" : ""}>
-                <td className="px-4 py-3">{r.exam_id}</td>
-                <td className="px-4 py-3">{r.subject_id}</td>
+                <td className="px-4 py-3">{r.exam_name || `Exam ${r.exam_id}`}</td>
+                <td className="px-4 py-3">{r.subject_name || `Subject ${r.subject_id}`}</td>
                 <td className="px-4 py-3">{r.marks_obtained}/{r.marks_total}</td>
+                <td className="px-4 py-3">{r.percentage ?? "-"}%</td>
               </tr>
             ))}
           </tbody>

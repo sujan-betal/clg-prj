@@ -20,7 +20,7 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
   const pageSize = 10;
 
   const [permNames, setPermNames] = useState<string[]>([]);
-  const [roles, setRoles] = useState<{ id: number; name: string; is_admin: boolean }[]>([]);
+  const [roles, setRoles] = useState<{ id: string; name: string; is_admin: boolean }[]>([]);
   const [createPerms, setCreatePerms] = useState<string[]>([]);
   const [newRole, setNewRole] = useState(role);
 

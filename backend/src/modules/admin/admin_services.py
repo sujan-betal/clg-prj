@@ -4,6 +4,8 @@ import os
 import secrets
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+
 from sqlalchemy import select, func, or_
 from starlette.concurrency import run_in_threadpool
 
@@ -36,6 +38,7 @@ from src.modules.admin.admin_schemas import (
     NoticeCreateSchema,
     EventCreateSchema,
     GalleryCreateSchema,
+    GalleryUpdateSchema,
     SiteContentSchema,
     CertificateCreateSchema,
     FeePaymentCreateSchema,
@@ -44,7 +47,8 @@ from src.modules.admin.admin_schemas import (
 from src.utils.password import hash_password
 from src.utils.jwt import create_reset_token
 from src.utils.mailer import send_password_setup_email, FRONTEND_URI
-from src.utils.common_schema import api_response_success, api_response_error
+from src.utils.common_schema import api_response_success, api_response_error
+from src.utils.identifiers import resolve
 from src.utils.status_code import StatusCode
 
 logger = logging.getLogger(__name__)
@@ -103,7 +107,7 @@ async def list_roles(db: AsyncSession):
 
     return api_response_success(data=[
         {
-            "id": r.id,
+            "id": r.public_id,
             "name": r.name,
             "description": r.description,
             "is_admin": bool(r.is_admin),
@@ -139,14 +143,14 @@ async def create_role(db: AsyncSession, payload: RoleCreateSchema, admin: User):
     await db.commit()
 
     return api_response_success(
-        data={"id": role.id, "name": role.name},
+        data={"id": role.public_id, "name": role.name},
         message="Role created",
         status_code=StatusCode.create
     )
 
 
-async def update_role(db: AsyncSession, role_id: int, payload: RoleUpdateSchema, admin: User):
-    role = (await db.execute(select(Role).where(Role.id == role_id))).scalar_one_or_none()
+async def update_role(db: AsyncSession, role_id: UUID, payload: RoleUpdateSchema, admin: User):
+    role = (await db.execute(select(Role).where(Role.id == await resolve(db, Role, role_id)))).scalar_one_or_none()
 
     if not role:
         return api_response_error(message="Role not found", status_code=StatusCode.notFound)
@@ -170,8 +174,8 @@ async def update_role(db: AsyncSession, role_id: int, payload: RoleUpdateSchema,
     return api_response_success(message="Role updated")
 
 
-async def delete_role(db: AsyncSession, role_id: int, admin: User):
-    role = (await db.execute(select(Role).where(Role.id == role_id))).scalar_one_or_none()
+async def delete_role(db: AsyncSession, role_id: UUID, admin: User):
+    role = (await db.execute(select(Role).where(Role.id == await resolve(db, Role, role_id)))).scalar_one_or_none()
 
     if not role:
         return api_response_error(message="Role not found", status_code=StatusCode.notFound)
@@ -334,14 +338,13 @@ async def create_user(db: AsyncSession, payload: CreateUserSchema, admin: User):
 
     role = role_row.name
 
+    department_id = None
     if payload.department_id is not None:
-        found = (await db.execute(
-            select(Department.id).where(Department.id == payload.department_id)
-        )).scalar_one_or_none()
+        department_id = await resolve(db, Department, payload.department_id)
 
-        if not found:
+        if department_id is None:
             return api_response_error(
-                message=f"Department {payload.department_id} not found",
+                message="Department not found",
                 status_code=StatusCode.notFound
             )
 
@@ -374,7 +377,7 @@ async def create_user(db: AsyncSession, payload: CreateUserSchema, admin: User):
             userid=user.userid,
             employee_id=f"EMP{uuid.uuid4().hex[:6].upper()}",
             designation=payload.designation,
-            department_id=payload.department_id,
+            department_id=department_id,
         ))
 
     _audit(db, admin, "USER_CREATED", "USER", user.userid, f"{role}:{user.username}")
@@ -470,7 +473,7 @@ async def stats(db: AsyncSession):
 async def list_departments(db: AsyncSession):
     rows = (await db.execute(select(Department))).scalars().all()
     return api_response_success(data=[
-        {"id": d.id, "name": d.name, "code": d.code, "description": d.description}
+        {"id": d.public_id, "name": d.name, "code": d.code, "description": d.description}
         for d in rows
     ])
 
@@ -490,7 +493,7 @@ async def create_department(db: AsyncSession, name: str, code: str, description:
     db.add(department)
     await db.commit()
     return api_response_success(
-        data={"id": department.id},
+        data={"id": department.public_id},
         message="Department created",
         status_code=StatusCode.create
     )
@@ -501,18 +504,24 @@ async def create_department(db: AsyncSession, name: str, code: str, description:
 # --------------------------------------------------
 
 async def list_courses(db: AsyncSession):
-    rows = (await db.execute(select(Course))).scalars().all()
+    rows = (await db.execute(
+        select(Course, Department.name, Department.public_id)
+        .outerjoin(Department, Department.id == Course.department_id)
+        .order_by(Course.name)
+    )).all()
+
     return api_response_success(data=[
         {
-            "id": c.id,
+            "id": c.public_id,
             "name": c.name,
             "code": c.code,
-            "department_id": c.department_id,
+            "department_id": dept_public_id,
+            "department_name": dept_name,
             "duration_years": c.duration_years,
             "total_seats": c.total_seats,
             "annual_fee": float(c.annual_fee or 0),
         }
-        for c in rows
+        for c, dept_name, dept_public_id in rows
     ])
 
 
@@ -527,22 +536,27 @@ async def create_course(db: AsyncSession, payload: CourseCreateSchema):
             status_code=StatusCode.badRequest
         )
 
-    found = (await db.execute(
-        select(Department.id).where(Department.id == payload.department_id)
-    )).scalar_one_or_none()
+    department_id = await resolve(db, Department, payload.department_id)
 
-    if not found:
+    if department_id is None:
         return api_response_error(
-            message=f"Department {payload.department_id} not found",
+            message="Department not found",
             status_code=StatusCode.notFound
         )
 
-    course = Course(**payload.model_dump())
+    course = Course(
+        department_id=department_id,
+        name=payload.name,
+        code=payload.code,
+        duration_years=payload.duration_years,
+        total_seats=payload.total_seats,
+        annual_fee=payload.annual_fee,
+    )
     db.add(course)
     await db.commit()
     await db.refresh(course)
     return api_response_success(
-        data={"id": course.id},
+        data={"id": course.public_id},
         message="Course created",
         status_code=StatusCode.create
     )
@@ -563,28 +577,24 @@ async def update_student_enrollment(db: AsyncSession, userid: str, payload: Stud
         return api_response_error(message="Student not found", status_code=StatusCode.notFound)
 
     if payload.course_id is not None:
-        found = (await db.execute(
-            select(Course.id).where(Course.id == payload.course_id)
-        )).scalar_one_or_none()
+        course_id = await resolve(db, Course, payload.course_id)
 
-        if not found:
+        if course_id is None:
             return api_response_error(
-                message=f"Course {payload.course_id} not found",
+                message="Course not found",
                 status_code=StatusCode.notFound
             )
-        student.course_id = payload.course_id
+        student.course_id = course_id
 
     if payload.department_id is not None:
-        found = (await db.execute(
-            select(Department.id).where(Department.id == payload.department_id)
-        )).scalar_one_or_none()
+        department_id = await resolve(db, Department, payload.department_id)
 
-        if not found:
+        if department_id is None:
             return api_response_error(
-                message=f"Department {payload.department_id} not found",
+                message="Department not found",
                 status_code=StatusCode.notFound
             )
-        student.department_id = payload.department_id
+        student.department_id = department_id
 
     if payload.semester is not None:
         student.semester = payload.semester
@@ -594,12 +604,15 @@ async def update_student_enrollment(db: AsyncSession, userid: str, payload: Stud
 
     await db.commit()
 
+    course_row = (await db.execute(select(Course).where(Course.id == student.course_id))).scalar_one_or_none()
+    dept_row = (await db.execute(select(Department).where(Department.id == student.department_id))).scalar_one_or_none()
+
     return api_response_success(
         data={
-            "course_id": student.course_id,
+            "course_id": course_row.public_id if course_row else None,
             "semester": student.semester,
             "section": student.section,
-            "department_id": student.department_id,
+            "department_id": dept_row.public_id if dept_row else None,
         },
         message="Student enrolled",
     )
@@ -611,16 +624,18 @@ async def update_student_enrollment(db: AsyncSession, userid: str, payload: Stud
 
 async def list_subjects(db: AsyncSession):
     rows = (await db.execute(
-        select(Subject, Course.name).join(Course, Course.id == Subject.course_id).order_by(Subject.name)
+        select(Subject, Course.name, Course.public_id)
+        .join(Course, Course.id == Subject.course_id)
+        .order_by(Subject.name)
     )).all()
 
     return api_response_success(data=[
         {
-            "id": s.id, "name": s.name, "code": s.code,
-            "course_id": s.course_id, "course_name": cname,
+            "id": s.public_id, "name": s.name, "code": s.code,
+            "course_id": course_public, "course_name": cname,
             "credits": s.credits, "semester": s.semester,
         }
-        for s, cname in rows
+        for s, cname, course_public in rows
     ])
 
 
@@ -632,17 +647,23 @@ async def create_subject(db: AsyncSession, payload: SubjectCreateSchema):
     if existing:
         return api_response_error(message="Subject code already exists", status_code=StatusCode.badRequest)
 
-    found = (await db.execute(select(Course.id).where(Course.id == payload.course_id))).scalar_one_or_none()
-    if not found:
-        return api_response_error(message=f"Course {payload.course_id} not found", status_code=StatusCode.notFound)
+    course_id = await resolve(db, Course, payload.course_id)
+    if course_id is None:
+        return api_response_error(message="Course not found", status_code=StatusCode.notFound)
 
-    subject = Subject(**payload.model_dump())
+    subject = Subject(
+        course_id=course_id,
+        name=payload.name,
+        code=payload.code,
+        credits=payload.credits,
+        semester=payload.semester,
+    )
     db.add(subject)
     await db.commit()
     await db.refresh(subject)
 
     return api_response_success(
-        data={"id": subject.id, "name": subject.name, "code": subject.code},
+        data={"id": subject.public_id, "name": subject.name, "code": subject.code},
         message="Subject created",
         status_code=StatusCode.create,
     )
@@ -650,7 +671,14 @@ async def create_subject(db: AsyncSession, payload: SubjectCreateSchema):
 
 async def list_teacher_subjects(db: AsyncSession):
     rows = (await db.execute(
-        select(TeacherSubject, Subject.name, Subject.code, User.username)
+        select(
+            TeacherSubject,
+            Subject.name,
+            Subject.code,
+            Subject.public_id,
+            User.username,
+            Teacher.public_id,
+        )
         .join(Subject, Subject.id == TeacherSubject.subject_id)
         .join(Teacher, Teacher.id == TeacherSubject.teacher_id)
         .join(User, User.userid == Teacher.userid)
@@ -659,32 +687,34 @@ async def list_teacher_subjects(db: AsyncSession):
 
     return api_response_success(data=[
         {
-            "id": ts.id,
-            "teacher_id": ts.teacher_id,
+            "id": ts.public_id,
+            "teacher_id": teacher_public_id,
             "teacher_name": uname,
-            "subject_id": ts.subject_id,
+            "subject_id": subject_public_id,
             "subject_name": sname,
             "subject_code": scode,
             "section": ts.section,
             "academic_year": ts.academic_year,
         }
-        for ts, sname, scode, uname in rows
+        for ts, sname, scode, subject_public_id, uname, teacher_public_id in rows
     ])
 
 
 async def assign_teacher_subject(db: AsyncSession, payload: TeacherSubjectCreateSchema):
-    teacher = (await db.execute(select(Teacher).where(Teacher.id == payload.teacher_id))).scalar_one_or_none()
-    if not teacher:
+    teacher_id = await resolve(db, Teacher, payload.teacher_id)
+    if teacher_id is None:
         return api_response_error(message="Teacher not found", status_code=StatusCode.notFound)
 
-    subject = (await db.execute(select(Subject).where(Subject.id == payload.subject_id))).scalar_one_or_none()
-    if not subject:
+    subject_id = await resolve(db, Subject, payload.subject_id)
+    if subject_id is None:
         return api_response_error(message="Subject not found", status_code=StatusCode.notFound)
+
+    subject = (await db.execute(select(Subject).where(Subject.id == subject_id))).scalar_one_or_none()
 
     existing = (await db.execute(
         select(TeacherSubject).where(
-            TeacherSubject.teacher_id == payload.teacher_id,
-            TeacherSubject.subject_id == payload.subject_id,
+            TeacherSubject.teacher_id == teacher_id,
+            TeacherSubject.subject_id == subject_id,
             TeacherSubject.section == payload.section,
         )
     )).scalar_one_or_none()
@@ -696,8 +726,8 @@ async def assign_teacher_subject(db: AsyncSession, payload: TeacherSubjectCreate
         )
 
     row = TeacherSubject(
-        teacher_id=payload.teacher_id,
-        subject_id=payload.subject_id,
+        teacher_id=teacher_id,
+        subject_id=subject_id,
         course_id=subject.course_id,
         section=payload.section,
         academic_year=payload.academic_year,
@@ -706,7 +736,7 @@ async def assign_teacher_subject(db: AsyncSession, payload: TeacherSubjectCreate
     await db.commit()
 
     return api_response_success(
-        data={"id": row.id},
+        data={"id": row.public_id},
         message="Subject assigned to teacher",
         status_code=StatusCode.create,
     )
@@ -728,7 +758,7 @@ async def create_notice(db: AsyncSession, payload: NoticeCreateSchema, admin: Us
     await db.commit()
 
     return api_response_success(
-        data={"id": notice.id}, message="Notice posted", status_code=StatusCode.create
+        data={"id": notice.public_id}, message="Notice posted", status_code=StatusCode.create
     )
 
 
@@ -742,14 +772,14 @@ async def create_event(db: AsyncSession, payload: EventCreateSchema):
     await db.commit()
 
     return api_response_success(
-        data={"id": event.id}, message="Event created", status_code=StatusCode.create
+        data={"id": event.public_id}, message="Event created", status_code=StatusCode.create
     )
 
 
 async def list_public_events(db: AsyncSession):
     rows = (await db.execute(select(Event).order_by(Event.event_date.desc()))).scalars().all()
     return api_response_success(data=[
-        {"id": e.id, "title": e.title, "description": e.description,
+        {"id": e.public_id, "title": e.title, "description": e.description,
          "event_date": e.event_date, "venue": e.venue}
         for e in rows
     ])
@@ -758,15 +788,24 @@ async def list_public_events(db: AsyncSession):
 async def list_public_gallery(db: AsyncSession):
     rows = (await db.execute(select(GalleryItem).order_by(GalleryItem.id.desc()))).scalars().all()
     return api_response_success(data=[
-        {"id": g.id, "title": g.title, "album": g.album, "image_url": g.image_url}
+        {"id": g.public_id, "title": g.title, "album": g.album, "image_url": g.image_url}
         for g in rows
     ])
 
 
 async def list_public_certificates(db: AsyncSession):
     rows = (await db.execute(select(Certificate).order_by(Certificate.id.desc()))).scalars().all()
+
+    student_ids = {}
+    if rows:
+        pairs = (await db.execute(
+            select(Student.id, Student.public_id)
+            .where(Student.id.in_({c.student_id for c in rows}))
+        )).all()
+        student_ids = {p[0]: p[1] for p in pairs}
+
     return api_response_success(data=[
-        {"id": c.id, "student_id": c.student_id, "title": c.title,
+        {"id": c.public_id, "student_id": student_ids.get(c.student_id), "title": c.title,
          "certificate_no": c.certificate_no, "issued_on": c.issued_on}
         for c in rows
     ])
@@ -778,8 +817,38 @@ async def create_gallery_item(db: AsyncSession, payload: GalleryCreateSchema):
     await db.commit()
 
     return api_response_success(
-        data={"id": item.id}, message="Gallery item added", status_code=StatusCode.create
+        data={"id": item.public_id}, message="Gallery item added", status_code=StatusCode.create
     )
+
+
+async def update_gallery_item(db: AsyncSession, item_id: UUID, payload: GalleryUpdateSchema):
+    row_id = await resolve(db, GalleryItem, item_id)
+    item = (await db.execute(
+        select(GalleryItem).where(GalleryItem.id == row_id)
+    )).scalar_one_or_none()
+
+    if not item:
+        return api_response_error(message="Gallery item not found", status_code=StatusCode.notFound)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+
+    await db.commit()
+    return api_response_success(data={"id": item.public_id}, message="Gallery item updated")
+
+
+async def delete_gallery_item(db: AsyncSession, item_id: UUID):
+    row_id = await resolve(db, GalleryItem, item_id)
+    item = (await db.execute(
+        select(GalleryItem).where(GalleryItem.id == row_id)
+    )).scalar_one_or_none()
+
+    if not item:
+        return api_response_error(message="Gallery item not found", status_code=StatusCode.notFound)
+
+    await db.delete(item)
+    await db.commit()
+    return api_response_success(message="Gallery item removed")
 
 
 async def set_site_content(db: AsyncSession, payload: SiteContentSchema):
@@ -797,29 +866,30 @@ async def set_site_content(db: AsyncSession, payload: SiteContentSchema):
 
 
 async def create_certificate(db: AsyncSession, payload: CertificateCreateSchema):
-    found = (await db.execute(
-        select(Student.id).where(Student.id == payload.student_id)
-    )).scalar_one_or_none()
+    student_id = await resolve(db, Student, payload.student_id)
 
-    if not found:
-        return api_response_error(message=f"Student {payload.student_id} not found", status_code=StatusCode.notFound)
+    if student_id is None:
+        return api_response_error(message="Student not found", status_code=StatusCode.notFound)
 
-    row = Certificate(**payload.model_dump())
+    row = Certificate(
+        student_id=student_id,
+        title=payload.title,
+        certificate_no=payload.certificate_no,
+        issued_on=payload.issued_on,
+    )
     db.add(row)
     await db.commit()
 
     return api_response_success(
-        data={"id": row.id}, message="Certificate issued", status_code=StatusCode.create
+        data={"id": row.public_id}, message="Certificate issued", status_code=StatusCode.create
     )
 
 
 async def record_fee_payment(db: AsyncSession, payload: FeePaymentCreateSchema):
-    found = (await db.execute(
-        select(Student.id).where(Student.id == payload.student_id)
-    )).scalar_one_or_none()
+    student_id = await resolve(db, Student, payload.student_id)
 
-    if not found:
-        return api_response_error(message=f"Student {payload.student_id} not found", status_code=StatusCode.notFound)
+    if student_id is None:
+        return api_response_error(message="Student not found", status_code=StatusCode.notFound)
 
     duplicate = (await db.execute(
         select(FeePayment.id).where(FeePayment.receipt_no == payload.receipt_no)
@@ -828,29 +898,34 @@ async def record_fee_payment(db: AsyncSession, payload: FeePaymentCreateSchema):
     if duplicate:
         return api_response_error(message="Receipt number already used", status_code=StatusCode.badRequest)
 
-    row = FeePayment(**payload.model_dump())
+    row = FeePayment(
+        student_id=student_id,
+        amount=payload.amount,
+        receipt_no=payload.receipt_no,
+        payment_mode=payload.payment_mode,
+    )
     db.add(row)
     await db.commit()
 
     return api_response_success(
-        data={"id": row.id}, message="Payment recorded", status_code=StatusCode.create
+        data={"id": row.public_id}, message="Payment recorded", status_code=StatusCode.create
     )
 
 
 async def list_fee_payments(db: AsyncSession):
     rows = (await db.execute(
-        select(FeePayment, Student.roll_no)
+        select(FeePayment, Student.roll_no, Student.public_id)
         .join(Student, Student.id == FeePayment.student_id)
         .order_by(FeePayment.id.desc())
     )).all()
 
     return api_response_success(data=[
         {
-            "id": p.id, "student_id": p.student_id, "roll_no": roll,
+            "id": p.public_id, "student_id": student_public_id, "roll_no": roll,
             "amount": float(p.amount or 0), "receipt_no": p.receipt_no,
             "payment_mode": p.payment_mode, "paid_on": p.paid_on,
         }
-        for p, roll in rows
+        for p, roll, student_public_id in rows
     ])
 
 
@@ -861,7 +936,7 @@ async def list_messages(db: AsyncSession):
 
     return api_response_success(data=[
         {
-            "id": m.id, "name": m.name, "email": m.email,
+            "id": m.public_id, "name": m.name, "email": m.email,
             "message": m.message, "created_at": m.created_at,
         }
         for m in rows
@@ -876,13 +951,22 @@ async def list_admissions(db: AsyncSession):
     rows = (await db.execute(
         select(AdmissionApplication).order_by(AdmissionApplication.created_at.desc())
     )).scalars().all()
+
+    course_public = {}
+    if rows:
+        pairs = (await db.execute(
+            select(Course.id, Course.public_id)
+            .where(Course.id.in_({a.course_id for a in rows if a.course_id}))
+        )).all()
+        course_public = {p[0]: p[1] for p in pairs}
+
     return api_response_success(data=[
         {
-            "id": a.id,
+            "id": a.public_id,
             "applicant_name": a.applicant_name,
             "email": a.email,
             "phone": a.phone,
-            "course_id": a.course_id,
+            "course_id": course_public.get(a.course_id),
             "status": a.status,
             "created_at": a.created_at,
         }
@@ -890,8 +974,9 @@ async def list_admissions(db: AsyncSession):
     ])
 
 
-async def update_admission_status(db: AsyncSession, app_id: int, status: str):
-    result = await db.execute(select(AdmissionApplication).where(AdmissionApplication.id == app_id))
+async def update_admission_status(db: AsyncSession, app_id: UUID, status: str):
+    row_id = await resolve(db, AdmissionApplication, app_id)
+    result = await db.execute(select(AdmissionApplication).where(AdmissionApplication.id == row_id))
     row = result.scalar_one_or_none()
 
     if not row:
@@ -909,28 +994,40 @@ async def update_admission_status(db: AsyncSession, app_id: int, status: str):
 
 async def list_fee_structures(db: AsyncSession):
     rows = (await db.execute(select(FeeStructure))).scalars().all()
+
+    course_ids = {}
+    if rows:
+        pairs = (await db.execute(
+            select(Course.id, Course.public_id)
+            .where(Course.id.in_({f.course_id for f in rows}))
+        )).all()
+        course_ids = {p[0]: p[1] for p in pairs}
+
     return api_response_success(data=[
-        {"id": f.id, "course_id": f.course_id, "head": f.head, "amount": float(f.amount or 0), "due_date": f.due_date}
+        {"id": f.public_id, "course_id": course_ids.get(f.course_id), "head": f.head, "amount": float(f.amount or 0), "due_date": f.due_date}
         for f in rows
     ])
 
 
 async def create_fee_structure(db: AsyncSession, payload: FeeStructureCreateSchema):
-    found = (await db.execute(
-        select(Course.id).where(Course.id == payload.course_id)
-    )).scalar_one_or_none()
+    course_id = await resolve(db, Course, payload.course_id)
 
-    if not found:
+    if course_id is None:
         return api_response_error(
-            message=f"Course {payload.course_id} not found",
+            message="Course not found",
             status_code=StatusCode.notFound
         )
 
-    structure = FeeStructure(**payload.model_dump())
+    structure = FeeStructure(
+        course_id=course_id,
+        head=payload.head,
+        amount=payload.amount,
+        due_date=payload.due_date,
+    )
     db.add(structure)
     await db.commit()
     return api_response_success(
-        data={"id": structure.id},
+        data={"id": structure.public_id},
         message="Fee structure created",
         status_code=StatusCode.create
     )
@@ -942,11 +1039,20 @@ async def create_fee_structure(db: AsyncSession, payload: FeeStructureCreateSche
 
 async def list_exams(db: AsyncSession):
     rows = (await db.execute(select(Exam).order_by(Exam.created_at.desc()))).scalars().all()
+
+    course_ids = {}
+    if rows:
+        pairs = (await db.execute(
+            select(Course.id, Course.public_id)
+            .where(Course.id.in_({e.course_id for e in rows if e.course_id}))
+        )).all()
+        course_ids = {p[0]: p[1] for p in pairs}
+
     return api_response_success(data=[
         {
-            "id": e.id,
+            "id": e.public_id,
             "name": e.name,
-            "course_id": e.course_id,
+            "course_id": course_ids.get(e.course_id),
             "semester": e.semester,
             "start_date": e.start_date,
             "is_published": e.is_published,
@@ -956,22 +1062,27 @@ async def list_exams(db: AsyncSession):
 
 
 async def create_exam(db: AsyncSession, payload: ExamCreateSchema):
+    course_id = None
     if payload.course_id is not None:
-        found = (await db.execute(
-            select(Course.id).where(Course.id == payload.course_id)
-        )).scalar_one_or_none()
+        course_id = await resolve(db, Course, payload.course_id)
 
-        if not found:
+        if course_id is None:
             return api_response_error(
-                message=f"Course {payload.course_id} not found",
+                message="Course not found",
                 status_code=StatusCode.notFound
             )
 
-    exam = Exam(**payload.model_dump())
+    exam = Exam(
+        name=payload.name,
+        course_id=course_id,
+        semester=payload.semester,
+        start_date=payload.start_date,
+        is_published=payload.is_published,
+    )
     db.add(exam)
     await db.commit()
     return api_response_success(
-        data={"id": exam.id},
+        data={"id": exam.public_id},
         message="Exam created",
         status_code=StatusCode.create
     )
@@ -985,7 +1096,7 @@ async def list_notices(db: AsyncSession):
     rows = (await db.execute(select(Notice).order_by(Notice.created_at.desc()))).scalars().all()
     return api_response_success(data=[
         {
-            "id": n.id,
+            "id": n.public_id,
             "title": n.title,
             "body": n.body,
             "audience": n.audience,
@@ -1008,12 +1119,25 @@ async def list_content(db: AsyncSession):
         select(Assignment).order_by(Assignment.created_at.desc())
     )).scalars().all()
 
+    # Resolve subject names and public ids once for both tables.
+    subject_ids = {m.subject_id for m in materials} | {a.subject_id for a in assignments}
+    names, subject_public = {}, {}
+    if subject_ids:
+        rows = (await db.execute(
+            select(Subject.id, Subject.name, Subject.code, Subject.public_id)
+            .where(Subject.id.in_(subject_ids))
+        )).all()
+        names = {r[0]: {"name": r[1], "code": r[2]} for r in rows}
+        subject_public = {r[0]: r[3] for r in rows}
+
     return api_response_success(data={
         "materials": [
             {
-                "id": m.id,
+                "id": m.public_id,
                 "title": m.title,
-                "subject_id": m.subject_id,
+                "subject_id": subject_public.get(m.subject_id),
+                "subject_name": names.get(m.subject_id, {}).get("name"),
+                "subject_code": names.get(m.subject_id, {}).get("code"),
                 "file_type": m.file_type,
                 "file_url": m.file_url,
                 "created_at": m.created_at,
@@ -1022,9 +1146,11 @@ async def list_content(db: AsyncSession):
         ],
         "assignments": [
             {
-                "id": a.id,
+                "id": a.public_id,
                 "title": a.title,
-                "subject_id": a.subject_id,
+                "subject_id": subject_public.get(a.subject_id),
+                "subject_name": names.get(a.subject_id, {}).get("name"),
+                "subject_code": names.get(a.subject_id, {}).get("code"),
                 "section": a.section,
                 "due_date": a.due_date,
                 "created_at": a.created_at,
@@ -1044,7 +1170,7 @@ async def list_leave(db: AsyncSession):
     )).scalars().all()
     return api_response_success(data=[
         {
-            "id": l.id,
+            "id": l.public_id,
             "userid": l.userid,
             "from_date": l.from_date,
             "to_date": l.to_date,
@@ -1056,8 +1182,9 @@ async def list_leave(db: AsyncSession):
     ])
 
 
-async def update_leave_status(db: AsyncSession, leave_id: int, status: str, reviewer: User = None):
-    result = await db.execute(select(LeaveRequest).where(LeaveRequest.id == leave_id))
+async def update_leave_status(db: AsyncSession, leave_id: UUID, status: str, reviewer: User = None):
+    row_id = await resolve(db, LeaveRequest, leave_id)
+    result = await db.execute(select(LeaveRequest).where(LeaveRequest.id == row_id))
     row = result.scalar_one_or_none()
 
     if not row:
@@ -1108,7 +1235,7 @@ async def audit_logs(db: AsyncSession, limit: int = 100):
     )).scalars().all()
     return api_response_success(data=[
         {
-            "id": a.id,
+            "id": a.public_id,
             "userid": a.userid,
             "action": a.action,
             "target_type": a.target_type,

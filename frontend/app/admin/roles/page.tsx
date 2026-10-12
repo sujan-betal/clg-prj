@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { usePermissionRefresh } from "@/components/RequirePermission";
 
 type Role = {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   is_admin: boolean;

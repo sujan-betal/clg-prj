@@ -25,7 +25,7 @@ export default function Admissions() {
       applicant_name: name,
       email,
       phone,
-      course_id: course_id ? Number(course_id) : undefined,
+      course_id: course_id || undefined,
     });
     setLoading(false);
     if (res.success) {

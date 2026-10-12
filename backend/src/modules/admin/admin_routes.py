@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
@@ -14,7 +15,8 @@ SubjectCreateSchema,
     TeacherSubjectCreateSchema,
     NoticeCreateSchema,
     EventCreateSchema,
-    GalleryCreateSchema,
+GalleryCreateSchema,
+    GalleryUpdateSchema,
     SiteContentSchema,
     CertificateCreateSchema,
     FeePaymentCreateSchema,
@@ -62,7 +64,7 @@ async def post_role(
 
 @router.put("/roles/{role_id}")
 async def put_role(
-    role_id: int,
+    role_id: UUID,
     payload: RoleUpdateSchema,
     db: AsyncSession = Depends(get_db),
     user=Depends(admin_only),
@@ -72,7 +74,7 @@ async def put_role(
 
 @router.delete("/roles/{role_id}")
 async def remove_role(
-    role_id: int,
+    role_id: UUID,
     db: AsyncSession = Depends(get_db),
     user=Depends(admin_only),
 ):
@@ -155,6 +157,25 @@ async def post_gallery(
     user=Depends(admin_only),
 ):
     return await admin_services.create_gallery_item(db, payload)
+
+
+@router.put("/gallery/{item_id}")
+async def put_gallery(
+    item_id: UUID,
+    payload: GalleryUpdateSchema,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(admin_only),
+):
+    return await admin_services.update_gallery_item(db, item_id, payload)
+
+
+@router.delete("/gallery/{item_id}")
+async def delete_gallery(
+    item_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(admin_only),
+):
+    return await admin_services.delete_gallery_item(db, item_id)
 
 
 @router.post("/site-content")
@@ -340,7 +361,7 @@ async def get_admissions(db: AsyncSession = Depends(get_db), user=Depends(scoped
 
 @router.put("/admissions/{app_id}/status")
 async def admission_status(
-    app_id: int,
+    app_id: UUID,
     payload: StatusUpdateSchema,
     db: AsyncSession = Depends(get_db),
     user=Depends(scoped("ADMISSION_MANAGE")),
@@ -413,7 +434,7 @@ async def get_leave(db: AsyncSession = Depends(get_db), user=Depends(scoped("LEA
 
 @router.put("/leave/{leave_id}/status")
 async def leave_status(
-    leave_id: int,
+    leave_id: UUID,
     payload: StatusUpdateSchema,
     db: AsyncSession = Depends(get_db),
     user=Depends(scoped("LEAVE_APPROVE")),

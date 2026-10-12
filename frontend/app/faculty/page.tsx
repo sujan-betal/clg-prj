@@ -23,16 +23,19 @@ export default function Faculty() {
           <p className="text-sm text-ink/50">Loading faculty...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No faculty records yet.</p>
-        ) : rows.map((f) => (
+) : rows.map((f) => (
           <div key={f.id} className="rounded-2xl border border-ink/10 bg-white p-6 hover:-translate-y-1 hover:shadow-md transition">
             <div className="grid h-14 w-14 place-items-center rounded-full bg-maroon font-display text-xl font-black text-saffron">
-              {String(f.employee_id).slice(0, 1)}
+              {String(f.username || f.name || f.employee_id).slice(0, 1).toUpperCase()}
             </div>
-            <h3 className="mt-4 font-display text-lg font-bold text-maroon">{f.employee_id}</h3>
+            <h3 className="mt-4 font-display text-lg font-bold text-maroon">
+              {f.username || f.name || f.employee_id}
+            </h3>
             <p className="text-sm text-ink/60">{f.designation || "-"}</p>
             <p className="mt-1 text-xs text-ink/40">
-              {f.is_department_head ? "Department Head" : `Dept ID: ${f.department_id ?? "-"}`}
+              {f.department_name || (f.is_department_head ? "Department Head" : "Dept ID: " + (f.department_id ?? "-"))}
             </p>
+            <p className="mt-1 text-xs text-ink/30">{f.employee_id}</p>
           </div>
         ))}
       </section>

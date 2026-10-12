@@ -8,7 +8,7 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from src.config.base import Base
+from src.config.base import Base, GUID, new_uuid
 
 
 class Teacher(Base):
@@ -19,6 +19,14 @@ class Teacher(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     userid = Column(
@@ -74,6 +82,14 @@ class TeacherSubject(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     teacher_id = Column(

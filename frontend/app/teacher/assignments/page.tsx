@@ -7,6 +7,7 @@ export default function TeacherAssignments() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [form, setForm] = useState({ title: "", description: "", subject_id: "", section: "", due_date: "" });
 
   function load() {
@@ -17,7 +18,10 @@ export default function TeacherAssignments() {
     });
   }
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +29,7 @@ export default function TeacherAssignments() {
     const res = await api.teacherAddAssignment({
       title: form.title,
       description: form.description || undefined,
-      subject_id: Number(form.subject_id),
+      subject_id: form.subject_id,
       section: form.section || undefined,
       due_date: form.due_date || undefined,
     });
@@ -44,7 +48,14 @@ export default function TeacherAssignments() {
       <p className="mt-1 text-ink/80">Create and track assignments for your sections.</p>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-3 rounded-2xl border border-ink/10 bg-white p-6 shadow-sm md:grid-cols-2">
         <input required placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5" />
-        <input required placeholder="Subject ID" type="number" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5" />
+        <select required value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5">
+          <option value="">Select subject</option>
+          {subjects.map((s) => (
+            <option key={s.subject_id} value={s.subject_id}>
+              {s.subject_name || `Subject ${s.subject_id}`}
+            </option>
+          ))}
+        </select>
         <input placeholder="Section" value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5" />
         <input placeholder="Due date" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5" />
         <textarea placeholder="Description" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="rounded-lg border border-ink/15 px-4 py-2.5 md:col-span-2" />
@@ -68,10 +79,13 @@ export default function TeacherAssignments() {
               <tr><td colSpan={4} className="px-4 py-3">No assignments.</td></tr>
             ) : rows.map((r, i) => (
               <tr key={r.id ?? i} className={i % 2 ? "bg-cream/60" : ""}>
-                <td className="px-4 py-3">{r.title}</td>
-                <td className="px-4 py-3">{r.subject_id}</td>
-                <td className="px-4 py-3">{r.section}</td>
-                <td className="px-4 py-3">{r.due_date}</td>
+                <td className="px-4 py-3">
+                  <div className="font-semibold">{r.title}</div>
+                  {r.description && <div className="text-xs text-ink/50">{r.description}</div>}
+                </td>
+                <td className="px-4 py-3">{r.subject_name || `Subject ${r.subject_id}`}</td>
+                <td className="px-4 py-3">{r.section || "All"}</td>
+                <td className="px-4 py-3">{r.due_date ? new Date(r.due_date).toLocaleDateString() : "-"}</td>
               </tr>
             ))}
           </tbody>

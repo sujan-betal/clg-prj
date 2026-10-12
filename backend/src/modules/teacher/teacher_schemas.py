@@ -1,10 +1,12 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class UpdateTeacherProfileSchema(BaseModel):
     designation: Optional[str] = Field(None, max_length=60)
-    department_id: Optional[int] = None
+    department_id: Optional[UUID] = None
 
 
 class PostNoticeSchema(BaseModel):

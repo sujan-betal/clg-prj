@@ -9,7 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from src.config.base import Base
+from src.config.base import Base, GUID, new_uuid
 
 
 class Notice(Base):
@@ -20,6 +20,14 @@ class Notice(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     title = Column(
@@ -76,6 +84,14 @@ class StudyMaterial(Base):
         index=True
     )
 
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
+    )
+
     title = Column(
         String(255),
         nullable=False
@@ -122,6 +138,14 @@ class Assignment(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     title = Column(

@@ -20,7 +20,7 @@ export default function AdminAdmissions() {
 
   useEffect(load, []);
 
-  async function setStatus(id: number, status: string) {
+  async function setStatus(id: string, status: string) {
     const res = await api.adminUpdateAdmission(id, status);
     if (res.success) load();
   }

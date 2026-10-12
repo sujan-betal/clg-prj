@@ -22,7 +22,7 @@ const [dept, setDept] = useState({ name: "", code: "", description: "" });
     });
   }
 
-  const deptName = (id: number) => departments.find((d) => d.id === id)?.name || `Department #${id}`;
+  const deptName = (id: string) => departments.find((d) => d.id === id)?.name || `Department #${id}`;
 
   useEffect(() => {
     load();
@@ -37,7 +37,7 @@ const [dept, setDept] = useState({ name: "", code: "", description: "" });
     const res = await api.adminCreateCourse({
       name: form.name,
       code: form.code,
-      department_id: Number(form.department_id),
+      department_id: form.department_id,
       duration_years: form.duration_years ? Number(form.duration_years) : undefined,
       total_seats: form.total_seats ? Number(form.total_seats) : undefined,
       annual_fee: form.annual_fee ? Number(form.annual_fee) : undefined,

@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 export default function TeacherMaterials() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [title, setTitle] = useState("");
   const [subject_id, setSubjectId] = useState("");
   const [file_url, setFileUrl] = useState("");
@@ -20,6 +21,7 @@ export default function TeacherMaterials() {
 
   useEffect(() => {
     load();
+    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -27,7 +29,7 @@ export default function TeacherMaterials() {
     setMessage("");
     const res = await api.teacherAddMaterial({
       title,
-      subject_id: Number(subject_id),
+       subject_id,
       file_url: file_url || undefined,
       file_type: file_type || undefined,
     });
@@ -43,7 +45,7 @@ export default function TeacherMaterials() {
     }
   }
 
-  const columns = ["title", "subject_id", "file_type", "file_url"];
+  const columns = ["title", "subject_name", "file_type", "file_url"];
 
   return (
     <>
@@ -51,7 +53,14 @@ export default function TeacherMaterials() {
       <p className="mt-1 text-ink/80">Upload and manage study materials for your subjects.</p>
       <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
         <input required placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
-        <input required type="number" placeholder="Subject ID" value={subject_id} onChange={(e) => setSubjectId(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
+        <select required value={subject_id} onChange={(e) => setSubjectId(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm">
+          <option value="">Select subject</option>
+          {subjects.map((s) => (
+            <option key={s.subject_id} value={s.subject_id}>
+              {s.subject_name || `Subject ${s.subject_id}`}
+            </option>
+          ))}
+        </select>
         <input placeholder="File URL" value={file_url} onChange={(e) => setFileUrl(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
         <input placeholder="Type (PDF)" value={file_type} onChange={(e) => setFileType(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
         <button className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream">Add Material</button>
@@ -62,7 +71,7 @@ export default function TeacherMaterials() {
           <thead>
             <tr className="bg-maroon text-cream">
               {columns.map((c) => (
-                <th key={c} className="px-4 py-3 text-left font-semibold">{c.replace("_", " ")}</th>
+                <th key={c} className="px-4 py-3 text-left font-semibold">{c.replace(/_/g, " ")}</th>
               ))}
             </tr>
           </thead>
@@ -74,7 +83,7 @@ export default function TeacherMaterials() {
             ) : rows.map((r, i) => (
               <tr key={r.id ?? i} className={i % 2 ? "bg-cream/60" : ""}>
                 <td className="px-4 py-3">{r.title}</td>
-                <td className="px-4 py-3">{r.subject_id}</td>
+                <td className="px-4 py-3">{r.subject_name || `Subject ${r.subject_id}`}</td>
                 <td className="px-4 py-3">{r.file_type || "-"}</td>
                 <td className="px-4 py-3">{r.file_url || "-"}</td>
               </tr>

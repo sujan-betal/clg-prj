@@ -10,7 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 
-from src.config.base import Base
+from src.config.base import Base, GUID, new_uuid
 
 
 class FeeStructure(Base):
@@ -21,6 +21,14 @@ class FeeStructure(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     course_id = Column(
@@ -58,6 +66,14 @@ class FeePayment(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     student_id = Column(
@@ -101,6 +117,14 @@ class LeaveRequest(Base):
         Integer,
         primary_key=True,
         index=True
+    )
+
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
     )
 
     userid = Column(
@@ -150,6 +174,14 @@ class AdmissionApplication(Base):
         index=True
     )
 
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
+    )
+
     applicant_name = Column(
         String(150),
         nullable=False
@@ -197,6 +229,14 @@ class AuditLog(Base):
         index=True
     )
 
+    public_id = Column(
+        GUID,
+        unique=True,
+        index=True,
+        default=new_uuid,
+        nullable=False
+    )
+
     userid = Column(
         String(36),
         nullable=True
@@ -213,7 +253,7 @@ class AuditLog(Base):
     )
 
     target_id = Column(
-        String(36),
+        String(64),
         nullable=True
     )
 

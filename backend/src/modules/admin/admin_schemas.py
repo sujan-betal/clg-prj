@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from typing import Any, Optional
 from datetime import date as date_type
 from pydantic import BaseModel, Field, EmailStr
@@ -9,7 +11,7 @@ class CreateUserSchema(BaseModel):
     role: str = Field(default="STUDENT")
     status: str = Field(default="ACTIVE")
     designation: Optional[str] = None
-    department_id: Optional[int] = None
+    department_id: Optional[UUID] = None
     # Permission names, e.g. ["USER_VIEW"] or "USER_VIEW, FEE_VIEW".
     permissions: Optional[Any] = None
 
@@ -26,7 +28,7 @@ class RoleUpdateSchema(BaseModel):
 
 
 class SubjectCreateSchema(BaseModel):
-    course_id: int
+    course_id: UUID
     name: str = Field(..., min_length=1)
     code: str = Field(..., min_length=1)
     credits: int = 4
@@ -34,8 +36,8 @@ class SubjectCreateSchema(BaseModel):
 
 
 class TeacherSubjectCreateSchema(BaseModel):
-    teacher_id: int
-    subject_id: int
+    teacher_id: UUID
+    subject_id: UUID
     section: str = Field(..., min_length=1)
     academic_year: Optional[str] = None
 
@@ -60,30 +62,36 @@ class GalleryCreateSchema(BaseModel):
     image_url: Optional[str] = None
 
 
+class GalleryUpdateSchema(BaseModel):
+    title: Optional[str] = None
+    album: Optional[str] = None
+    image_url: Optional[str] = None
+
+
 class SiteContentSchema(BaseModel):
     key: str = Field(..., min_length=1)
     value: Optional[str] = None
 
 
 class CertificateCreateSchema(BaseModel):
-    student_id: int
+    student_id: UUID
     title: str = Field(..., min_length=1)
     certificate_no: Optional[str] = None
     issued_on: Optional[date_type] = None
 
 
 class FeePaymentCreateSchema(BaseModel):
-    student_id: int
+    student_id: UUID
     amount: float
     receipt_no: str = Field(..., min_length=1)
     payment_mode: str = "CASH"
 
 
 class StudentEnrollmentSchema(BaseModel):
-    course_id: Optional[int] = None
+    course_id: Optional[UUID] = None
     semester: Optional[int] = None
     section: Optional[str] = None
-    department_id: Optional[int] = None
+    department_id: Optional[UUID] = None
 
 
 class SetPermissionsSchema(BaseModel):
@@ -102,7 +110,7 @@ class DepartmentCreateSchema(BaseModel):
 
 
 class CourseCreateSchema(BaseModel):
-    department_id: int
+    department_id: UUID
     name: str = Field(..., min_length=1)
     code: str = Field(..., min_length=1)
     duration_years: int = 3
@@ -111,7 +119,7 @@ class CourseCreateSchema(BaseModel):
 
 
 class FeeStructureCreateSchema(BaseModel):
-    course_id: int
+    course_id: UUID
     head: str = Field(..., min_length=1)
     amount: float = 0
     due_date: Optional[date_type] = None
@@ -119,7 +127,7 @@ class FeeStructureCreateSchema(BaseModel):
 
 class ExamCreateSchema(BaseModel):
     name: str = Field(..., min_length=1)
-    course_id: Optional[int] = None
+    course_id: Optional[UUID] = None
     semester: Optional[int] = None
     start_date: Optional[date_type] = None
     is_published: int = 0

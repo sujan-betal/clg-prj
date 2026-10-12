@@ -35,10 +35,13 @@ export default function StudentAssignments() {
               <tr><td colSpan={4} className="px-4 py-3">No assignments.</td></tr>
             ) : rows.map((r, i) => (
               <tr key={r.id ?? i} className={i % 2 ? "bg-cream/60" : ""}>
-                <td className="px-4 py-3">{r.title}</td>
-                <td className="px-4 py-3">{r.subject_id}</td>
-                <td className="px-4 py-3">{r.section}</td>
-                <td className="px-4 py-3">{r.due_date}</td>
+                <td className="px-4 py-3">
+                  <div className="font-semibold">{r.title}</div>
+                  <div className="text-xs text-ink/50">{r.description || ""}</div>
+                </td>
+                <td className="px-4 py-3">{r.subject_name || `Subject ${r.subject_id}`}</td>
+                <td className="px-4 py-3">{r.section || "All"}</td>
+                <td className="px-4 py-3">{r.due_date ? new Date(r.due_date).toLocaleDateString() : "-"}</td>
               </tr>
             ))}
           </tbody>

@@ -5,7 +5,7 @@ import { api, getUsername } from "@/lib/api";
 
 export default function StudentOverview() {
   const [profile, setProfile] = useState<any>(null);
-  const [noticeCount, setNoticeCount] = useState(0);
+  const [counts, setCounts] = useState({ notices: 0, attendance: 0, marks: 0, materials: 0 });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ guardian_phone: "", section: "" });
   const [message, setMessage] = useState("");
@@ -22,7 +22,19 @@ export default function StudentOverview() {
 
   useEffect(() => {
     api.studentProfile().then(applyProfile);
-    api.studentNotices().then((res) => res.success && setNoticeCount((res.data || []).length));
+    Promise.all([
+      api.studentNotices(),
+      api.studentAttendance(),
+      api.studentMarks(),
+      api.studentMaterials(),
+    ]).then(([notices, attendance, marks, materials]) => {
+      setCounts({
+        notices: (notices.data || []).length,
+        attendance: (attendance.data || []).length,
+        marks: (marks.data || []).length,
+        materials: (materials.data || []).length,
+      });
+    });
   }, []);
 
   async function save(e: React.FormEvent) {
@@ -46,25 +58,43 @@ export default function StudentOverview() {
       <h1 className="font-display text-3xl font-black text-maroon">Hi, {getUsername() || "Student"}</h1>
       <p className="mt-1 text-ink/60">
         {profile
-          ? `Semester ${profile.semester} · Section ${profile.section} · Roll ${profile.roll_no}`
+          ? `${profile.course_name || "Not enrolled"} · Semester ${profile.semester} · Section ${profile.section || "-"} · Roll ${profile.roll_no}`
           : "Loading your profile..."}
       </p>
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{profile?.guardian_phone || "-"}</p>
-          <p className="text-xs tracking-widest text-ink/50">GUARDIAN PHONE</p>
+          <p className="font-display text-lg font-black text-maroon">{profile?.department_name || "-"}</p>
+          <p className="mt-2 text-xs tracking-widest text-ink/50">DEPARTMENT</p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{profile?.department_id ?? "-"}</p>
-          <p className="text-xs tracking-widest text-ink/50">DEPT ID</p>
+          <p className="font-display text-lg font-black text-maroon">{profile?.course_name || "-"}</p>
+          <p className="mt-2 text-xs tracking-widest text-ink/50">PROGRAM</p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{profile?.course_id ?? "-"}</p>
-          <p className="text-xs tracking-widest text-ink/50">COURSE ID</p>
+          <p className="font-display text-3xl font-black text-maroon">{counts.attendance}</p>
+          <p className="text-xs tracking-widest text-ink/50">ATTENDANCE</p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{noticeCount}</p>
+          <p className="font-display text-3xl font-black text-maroon">{counts.marks}</p>
+          <p className="text-xs tracking-widest text-ink/50">RESULTS</p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+          <p className="font-display text-lg font-black text-maroon">{profile?.guardian_phone || "-"}</p>
+          <p className="mt-2 text-xs tracking-widest text-ink/50">GUARDIAN PHONE</p>
+        </div>
+        <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+          <p className="font-display text-3xl font-black text-maroon">{counts.materials}</p>
+          <p className="text-xs tracking-widest text-ink/50">MATERIALS</p>
+        </div>
+        <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+          <p className="font-display text-3xl font-black text-maroon">{counts.notices}</p>
           <p className="text-xs tracking-widest text-ink/50">NOTICES</p>
+        </div>
+        <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+          <p className="font-display text-3xl font-black text-maroon">{profile?.roll_no || "-"}</p>
+          <p className="text-xs tracking-widest text-ink/50">ROLL NO</p>
         </div>
       </div>
 

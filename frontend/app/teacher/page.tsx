@@ -30,7 +30,7 @@ export default function TeacherOverview() {
     setMessage("");
     const res = await api.teacherUpdateProfile({
       designation: form.designation || undefined,
-      department_id: form.department_id ? Number(form.department_id) : undefined,
+      department_id: form.department_id || undefined,
     });
     if (res.success) {
       setMessage(res.message || "Profile updated");
@@ -44,8 +44,10 @@ export default function TeacherOverview() {
   return (
     <>
       <h1 className="font-display text-3xl font-black text-maroon">Welcome, {getUsername() || "Teacher"}</h1>
-      <p className="mt-1 text-ink/60">
-        {profile ? `${profile.designation} · Employee ${profile.employee_id}` : "Loading your profile..."}
+<p className="mt-1 text-ink/60">
+        {profile
+          ? `${profile.designation || "Faculty"} · ${profile.department_name || "No department"} · ${profile.employee_id}`
+          : "Loading your profile..."}
       </p>
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
@@ -53,11 +55,19 @@ export default function TeacherOverview() {
           <p className="text-xs tracking-widest text-ink/50">SUBJECTS</p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{profile?.department_id ?? "-"}</p>
-          <p className="text-xs tracking-widest text-ink/50">DEPT ID</p>
+          <p className="font-display text-lg font-black text-maroon">{profile?.department_name || "-"}</p>
+          <p className="mt-2 text-xs tracking-widest text-ink/50">DEPARTMENT</p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-          <p className="font-display text-3xl font-black text-maroon">{profile?.is_department_head ? "Yes" : "No"}</p>
+          <p className="font-display text-3xl font-black text-maroon">
+            {subjects.reduce((sum, s) => sum + (s.students_count || 0), 0)}
+          </p>
+          <p className="text-xs tracking-widest text-ink/50">STUDENTS</p>
+        </div>
+        <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
+          <p className="font-display text-3xl font-black text-maroon">
+            {profile?.is_department_head ? "Yes" : "No"}
+          </p>
           <p className="text-xs tracking-widest text-ink/50">DEPT HEAD</p>
         </div>
       </div>
@@ -67,7 +77,11 @@ export default function TeacherOverview() {
           <li className="rounded-xl border border-ink/10 bg-white px-4 py-3 text-sm">No subjects assigned.</li>
         ) : subjects.map((s, i) => (
           <li key={i} className="rounded-xl border border-ink/10 bg-white px-4 py-3 text-sm">
-            Subject {s.subject_id} · Course {s.course_id} · Section {s.section} · {s.academic_year}
+            <span className="font-semibold">{s.subject_name || `Subject ${s.subject_id}`}</span>
+            <span className="ml-2 text-xs text-ink/40">{s.subject_code}</span>
+            <span className="ml-2 text-ink/60">
+              · {s.course_name || `Course ${s.course_id}`} · Section {s.section} · {s.academic_year}
+            </span>
           </li>
         ))}
       </ul>

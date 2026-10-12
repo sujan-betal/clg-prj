@@ -3,6 +3,8 @@ services:
     image: postgres:15-alpine
     container_name: college_postgres
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-college_db}
       POSTGRES_USER: ${POSTGRES_USER:-college_user}
@@ -15,23 +17,39 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: college_app
+      target: backend
+    container_name: college_backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-college_user}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-college_db}
-      FRONTEND_URI: ${FRONTEND_URI:-http://localhost}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-college_user}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-college_db}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "${BACKEND_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://127.0.0.1:8000}
+    container_name: college_frontend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   pgdata:

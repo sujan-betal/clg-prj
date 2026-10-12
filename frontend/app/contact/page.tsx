@@ -54,12 +54,14 @@ export default function Contact() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-ink/10 bg-white p-6">
             <h3 className="font-semibold">Address</h3>
-            <p className="mt-1 text-ink/70">{contentLoading ? "Loading..." : content.address || "-"}</p>
+            <p className="mt-1 text-ink/70">{contentLoading ? "Loading..." : content.address || content.contact_address || "-"}</p>
           </div>
           <div className="rounded-2xl border border-ink/10 bg-white p-6">
             <h3 className="font-semibold">Phone & Email</h3>
             <p className="mt-1 text-ink/70">
-              {contentLoading ? "Loading..." : `${content.phone || "-"} · ${content.email || "-"}`}
+              {contentLoading
+                ? "Loading..."
+                : `${content.contact_phone || content.phone || "-"} · ${content.contact_email || content.email || "-"}`}
             </p>
           </div>
         </div>
