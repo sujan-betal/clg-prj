@@ -1,28 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
+
+type FeesData = {
+  fee_structure?: any[];
+  payments?: any[];
+  total_due?: number;
+  total_paid?: number;
+  balance?: number;
+};
 
 export default function StudentFees() {
-  const [feeStructure, setFeeStructure] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [totals, setTotals] = useState({ due: 0, paid: 0, balance: 0 });
-  const [loading, setLoading] = useState(true);
+  const { data, isPending } = useApiQuery<FeesData>(qk.studentFees, () => api.studentFees());
 
-  useEffect(() => {
-    api.studentFees().then((res) => {
-      if (res.success) {
-        setFeeStructure(res.data?.fee_structure || []);
-        setPayments(res.data?.payments || []);
-        setTotals({
-          due: res.data?.total_due ?? 0,
-          paid: res.data?.total_paid ?? 0,
-          balance: res.data?.balance ?? 0,
-        });
-      }
-      setLoading(false);
-    });
-  }, []);
+  const feeStructure = data?.fee_structure || [];
+  const payments = data?.payments || [];
+  const totals = {
+    due: data?.total_due ?? 0,
+    paid: data?.total_paid ?? 0,
+    balance: data?.balance ?? 0,
+  };
 
   function renderTable(rows: any[], label: string, amountLabel: string, dateLabel: string) {
     return (
@@ -36,7 +34,7 @@ export default function StudentFees() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={3} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={3} className="px-4 py-3">No {label}.</td></tr>
@@ -65,7 +63,7 @@ export default function StudentFees() {
     <>
       <h1 className="font-display text-3xl font-black text-maroon">Fees</h1>
       <p className="mt-1 text-ink/80">Your fee structure and payment history.</p>
-      {!loading && feeStructure.length > 0 && (
+      {!isPending && feeStructure.length > 0 && (
         <div className="mt-6 grid grid-cols-3 gap-4">
           <div className="rounded-2xl border border-ink/10 bg-white p-5">
             <p className="font-display text-2xl font-black text-maroon">{totals.due}</p>

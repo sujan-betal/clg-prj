@@ -1,42 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Admissions() {
-  const [courses, setCourses] = useState<any[]>([]);
+  const { data: courses = [] } = useApiQuery<any[]>(qk.courses, () => api.publicCourses());
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [course_id, setCourseId] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    api.publicCourses().then((res) => res.success && setCourses(res.data || []));
-  }, []);
+  const apply = useMutation({
+    mutationFn: () =>
+      api.publicApply({
+        applicant_name: name,
+        email,
+        phone,
+        course_id: course_id || undefined,
+      }),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Application submitted successfully.");
+        setName("");
+        setEmail("");
+        setPhone("");
+        setCourseId("");
+      } else {
+        setMessage(res.message || "Failed to submit application");
+      }
+    },
+    onError: () => setMessage("Failed to submit application"),
+  });
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setMessage("");
-    const res = await api.publicApply({
-      applicant_name: name,
-      email,
-      phone,
-      course_id: course_id || undefined,
-    });
-    setLoading(false);
-    if (res.success) {
-      setMessage("Application submitted successfully.");
-      setName("");
-      setEmail("");
-      setPhone("");
-      setCourseId("");
-    } else {
-      setMessage(res.message || "Failed to submit application");
-    }
+    apply.mutate();
   }
 
   return (
@@ -60,8 +64,8 @@ export default function Admissions() {
               ))}
             </select>
           </div>
-          <button disabled={loading} className="rounded-full bg-maroon px-8 py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">
-            {loading ? "Submitting..." : "Submit Application"}
+          <button disabled={apply.isPending} className="rounded-full bg-maroon px-8 py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">
+            {apply.isPending ? "Submitting..." : "Submit Application"}
           </button>
           {message && <p className="text-sm text-ink/70">{message}</p>}
         </form>

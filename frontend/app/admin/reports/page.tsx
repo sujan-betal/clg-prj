@@ -1,25 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission from "@/components/RequirePermission";
 
 export default function AdminReports() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.adminReports().then((res) => {
-      if (res.success) setData(res.data);
-      setLoading(false);
-    });
-  }, []);
+  const { data, isPending } = useApiQuery<any>(qk.adminReports, () => api.adminReports());
 
   return (
     <RequirePermission permission="REPORT_VIEW">
       <h1 className="font-display text-3xl font-black text-maroon">Reports</h1>
       <p className="mt-1 text-ink/80">Key institutional metrics.</p>
-      {loading ? (
+      {isPending ? (
         <p className="mt-6 text-sm">Loading...</p>
       ) : !data ? (
         <p className="mt-6 text-sm">No report data.</p>

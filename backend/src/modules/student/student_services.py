@@ -6,7 +6,7 @@ from src.models.student_model import Student
 from src.models.academic_model import Attendance, Marks, Exam
 from src.models.course_model import Department, Course, Subject
 from src.models.content_model import Notice, StudyMaterial, Assignment
-from src.models.activity_model import FeeStructure, FeePayment
+from src.models.activity_model import FeeStructure, FeePayment, LeaveRequest
 from src.models.site_model import Certificate
 from src.modules.student.student_schemas import UpdateStudentProfileSchema
 from src.utils.common_schema import api_response_success, api_response_error
@@ -235,3 +235,31 @@ async def get_certificates(db: AsyncSession, user: User):
 
     rows = (await db.execute(select(Certificate).where(Certificate.student_id == student.id).order_by(Certificate.issued_on.desc()))).scalars().all()
     return api_response_success(data=[{"id": c.public_id, "title": c.title, "certificate_no": c.certificate_no, "issued_on": c.issued_on} for c in rows])
+
+
+async def get_leave(db: AsyncSession, user: User):
+    rows = (await db.execute(
+        select(LeaveRequest).where(LeaveRequest.userid == user.userid).order_by(LeaveRequest.created_at.desc())
+    )).scalars().all()
+
+    return api_response_success(data=[
+        {
+            "id": l.public_id,
+            "from_date": l.from_date,
+            "to_date": l.to_date,
+            "reason": l.reason,
+            "status": l.status,
+            "created_at": l.created_at,
+        }
+        for l in rows
+    ])
+
+
+async def apply_leave(db: AsyncSession, user: User, payload):
+    if payload.to_date < payload.from_date:
+        return api_response_error(message="To date must be on or after the from date", status_code=StatusCode.badRequest)
+
+    l = LeaveRequest(userid=user.userid, from_date=payload.from_date, to_date=payload.to_date, reason=payload.reason)
+    db.add(l)
+    await db.commit()
+    return api_response_success(data={"id": l.public_id}, message="Leave applied", status_code=StatusCode.create)

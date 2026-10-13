@@ -10,6 +10,7 @@ const links: [string, string][] = [
   ["Assignments", "/student/assignments"],
   ["Notices", "/student/notices"],
   ["Certificates", "/student/certificates"],
+  ["Leave", "/student/leave"],
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {

@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<{ total_users: number; students: number; teachers: number } | null>(null);
-  const [error, setError] = useState("");
   usePermissionRefresh();
   const canViewStats = hasPermission("USER_VIEW");
 
-  useEffect(() => {
-    if (!canViewStats) return;
-    api.adminStats().then((res) => {
-      if (res.success) setStats(res.data);
-      else setError(res.message || "Failed to load stats");
-    });
-  }, [canViewStats]);
+  const { data: stats, error: statsError } = useApiQuery<{
+    total_users: number;
+    students: number;
+    teachers: number;
+  }>(qk.stats, () => api.adminStats(), { enabled: canViewStats });
+  const error = statsError ? statsError.message : "";
 
   const cards = [
     { n: stats ? String(stats.total_users) : "-", l: "Total Users" },

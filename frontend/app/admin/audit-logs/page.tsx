@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission from "@/components/RequirePermission";
 
 export default function AuditLogs() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.adminAuditLogs().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminAuditLogs, () =>
+    api.adminAuditLogs()
+  );
 
   const columns = rows.length > 0 ? Object.keys(rows[0]).slice(0, 6) : [];
 
@@ -31,7 +25,7 @@ export default function AuditLogs() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-3">No audit logs.</td></tr>

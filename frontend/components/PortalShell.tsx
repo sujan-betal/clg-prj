@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import LogoutButton from "@/components/LogoutButton";
-import { api, hasPermission } from "@/lib/api";
-import { usePermissionRefresh } from "@/components/RequirePermission";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
+import { qk, useApiQuery } from "@/lib/queries";
 
 const linkPermissions: Record<string, string> = {
   "/admin/students": "USER_VIEW",
@@ -32,20 +33,13 @@ export default function PortalShell({
   links: [string, string][];
   children: ReactNode;
 }) {
-  // Re-filter sidebar links when permissions refresh in the background.
-  usePermissionRefresh();
-  const [me, setMe] = useState<{ username?: string; email?: string } | null>(null);
-
-  useEffect(() => {
-    api.me().then((res) => {
-      if (res.success) setMe(res.data);
-    });
-  }, []);
+  const me = useApiQuery<{ username?: string; email?: string }>(qk.me, () => api.me());
+  const permissions = useAuthStore((s) => s.session?.permissions);
 
   const visible = links.filter(([label, href]) => {
     const permission = linkPermissions[href];
     if (!permission) return true;
-    return hasPermission(permission);
+    return allows(permissions, permission);
   });
 
   return (
@@ -55,10 +49,10 @@ export default function PortalShell({
         <p className="mb-1 text-[10px] tracking-[0.3em] text-ink/50">
           {role} PORTAL
         </p>
-        {me?.username && (
+        {me.data?.username && (
           <p className="mb-3 truncate text-xs text-ink/60">
-            {me.username}
-            {me.email ? ` · ${me.email}` : ""}
+            {me.data.username}
+            {me.data.email ? ` · ${me.data.email}` : ""}
           </p>
         )}
         <nav className="flex gap-2 overflow-x-auto md:flex-col md:gap-1">
@@ -77,4 +71,10 @@ export default function PortalShell({
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
+}
+
+// Small wrapper so the sidebar re-filters reactively when the store updates.
+function allows(permissions: string[] | undefined, code: string) {
+  if (!permissions) return false;
+  return permissions.includes("ALL") || permissions.includes(code.toUpperCase());
 }

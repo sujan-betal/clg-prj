@@ -2,58 +2,70 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, saveSession } from "@/lib/api";
 
 export default function Login() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [loading, setLoading] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetNotice, setResetNotice] = useState("");
 
-  async function handleForgot(e: React.FormEvent) {
+  const forgotPassword = useMutation({
+    mutationFn: () => api.forgotPassword(resetEmail),
+    onSuccess: (res) =>
+      setResetNotice(
+        res.message || "If that email is registered, a reset link is on its way."
+      ),
+  });
+
+  const login = useMutation({
+    mutationFn: () => api.login(username, password),
+    onSuccess: (res) => {
+      if (!res.success) {
+        setError(res.message || "Login failed");
+        return;
+      }
+
+      setNotice("");
+      saveSession({
+        access_token: res.data.access_token,
+        refresh_token: res.data.refresh_token,
+        role: res.data.role,
+        username: res.data.username,
+        permissions: res.data.permissions || [],
+      });
+
+      // Drop cached data so the next login never sees the previous session.
+      queryClient.clear();
+
+      if (res.data.is_reset) {
+        router.replace("/change-password");
+        return;
+      }
+
+      const role = (res.data.role || "").toUpperCase();
+      if (role === "ADMIN") router.replace("/admin");
+      else if (role === "TEACHER") router.replace("/teacher");
+      else router.replace("/student");
+    },
+  });
+
+  function handleForgot(e: React.FormEvent) {
     e.preventDefault();
     setResetNotice("");
-    const res = await api.forgotPassword(resetEmail);
-    setResetNotice(
-      res.message || "If that email is registered, a reset link is on its way."
-    );
+    forgotPassword.mutate();
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
-    const res = await api.login(username, password);
-    setLoading(false);
-
-    if (!res.success) {
-      setError(res.message || "Login failed");
-      return;
-    }
-
-    setNotice("");
-    saveSession({
-      access_token: res.data.access_token,
-      refresh_token: res.data.refresh_token,
-      role: res.data.role,
-      username: res.data.username,
-      permissions: res.data.permissions || [],
-    });
-
-    if (res.data.is_reset) {
-      router.replace("/change-password");
-      return;
-    }
-
-    const role = (res.data.role || "").toUpperCase();
-    if (role === "ADMIN") router.replace("/admin");
-    else if (role === "TEACHER") router.replace("/teacher");
-    else router.replace("/student");
+    login.mutate();
   }
 
   if (forgot) {
@@ -124,10 +136,10 @@ export default function Login() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {notice && <p className="text-sm text-emerald-700">{notice}</p>}
           <button
-            disabled={loading}
+            disabled={login.isPending}
             className="w-full rounded-full bg-maroon py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {login.isPending ? "Signing in..." : "Sign In"}
           </button>
           <div className="flex items-center justify-between text-xs">
             <button

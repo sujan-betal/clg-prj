@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Events() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.publicEvents().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.events, () =>
+    api.publicEvents()
+  );
 
   return (
     <>
       <PageBanner kicker="WHAT'S ON" title="Events" text="From fests to fairs — there is always something happening on campus." />
       <section className="mx-auto max-w-4xl space-y-4 px-4 py-14">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm text-ink/50">Loading events...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No events scheduled yet.</p>

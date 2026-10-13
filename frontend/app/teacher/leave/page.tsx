@@ -1,39 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherLeave() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherLeave, () => api.teacherLeave());
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ from_date: "", to_date: "", reason: "" });
 
-  function load() {
-    setLoading(true);
-    api.teacherLeave().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const apply = useMutation({
+    mutationFn: (payload: { from_date: string; to_date: string; reason?: string }) =>
+      api.teacherApplyLeave(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Leave applied.");
+        setForm({ from_date: "", to_date: "", reason: "" });
+      } else {
+        setMessage(res.message || "Failed to apply leave");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherLeave });
+    },
+  });
 
-  useEffect(load, []);
-
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherApplyLeave({
+    apply.mutate({
       from_date: form.from_date,
       to_date: form.to_date,
       reason: form.reason || undefined,
     });
-    if (res.success) {
-      setMessage("Leave applied.");
-      setForm({ from_date: "", to_date: "", reason: "" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to apply leave");
-    }
   }
 
   return (
@@ -58,7 +57,7 @@ export default function TeacherLeave() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-3">No leave requests.</td></tr>

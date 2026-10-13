@@ -40,7 +40,10 @@ services:
       dockerfile: Dockerfile
       target: frontend
       args:
-        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://127.0.0.1:8000}
+        # Empty => browser calls /api/* on the same origin, and Next proxies
+        # them server-side to the backend container (see next.config.ts).
+        NEXT_PUBLIC_API_URL: ""
+        API_PROXY_URL: http://backend:8000
     container_name: college_frontend
     restart: unless-stopped
     environment:

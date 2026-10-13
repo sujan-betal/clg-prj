@@ -120,6 +120,9 @@ class Exam(Base):
 class Marks(Base):
 
     __tablename__ = "marks"
+    __table_args__ = (
+        UniqueConstraint("student_id", "exam_id", "subject_id", name="uq_marks_student_exam_subject"),
+    )
 
     id = Column(
         Integer,

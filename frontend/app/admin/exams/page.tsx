@@ -1,50 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission, { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminExams() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ name: "", course_id: "", semester: "", start_date: "", is_published: "0" });
   usePermissionRefresh();
   const canManage = hasPermission("EXAM_MANAGE");
+  const queryClient = useQueryClient();
+
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminExams, () =>
+    api.adminExams()
+  );
+  const { data: courses = [] } = useApiQuery<any[]>(qk.adminCourses, () =>
+    api.adminCourses()
+  );
 
   const courseName = (id: string) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
 
-  function load() {
-    setLoading(true);
-    api.adminExams().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const save = useMutation({
+    mutationFn: (payload: {
+      name: string;
+      course_id?: string;
+      semester?: number;
+      start_date?: string;
+      is_published?: number;
+    }) => api.adminCreateExam(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Exam created.");
+        setForm({ name: "", course_id: "", semester: "", start_date: "", is_published: "0" });
+        queryClient.invalidateQueries({ queryKey: qk.adminExams });
+      } else {
+        setMessage(res.message || "Failed to create exam");
+      }
+    },
+  });
 
-  useEffect(() => {
-    load();
-    api.adminCourses().then((res) => res.success && setCourses(res.data || []));
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.adminCreateExam({
+    save.mutate({
       name: form.name,
       course_id: form.course_id || undefined,
       semester: form.semester ? Number(form.semester) : undefined,
       start_date: form.start_date || undefined,
       is_published: Number(form.is_published),
     });
-    if (res.success) {
-      setMessage("Exam created.");
-      setForm({ name: "", course_id: "", semester: "", start_date: "", is_published: "0" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to create exam");
-    }
   }
 
   return (
@@ -97,7 +103,7 @@ export default function AdminExams() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={5} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-3">No exams.</td></tr>

@@ -233,8 +233,15 @@ def main():
     print(f"  fee payments ................. {done['fees']}")
 
     # ---------------------------------------------------------------- leave
-    for username, tok in (teacher_tokens[:3] + student_tokens[:5]):
+    # Teachers and students file leave on separate role-scoped routes.
+    for username, tok in teacher_tokens[:3]:
         write(tok, "POST", "/api/teacher/leave", {
+            "from_date": str(today + timedelta(days=random.randint(2, 15))),
+            "to_date": str(today + timedelta(days=random.randint(16, 25))),
+            "reason": random.choice(["Medical", "Family function", "Travel", "Personal"]),
+        }, "leave")
+    for username, tok in student_tokens[:5]:
+        write(tok, "POST", "/api/student/leave", {
             "from_date": str(today + timedelta(days=random.randint(2, 15))),
             "to_date": str(today + timedelta(days=random.randint(16, 25))),
             "reason": random.choice(["Medical", "Family function", "Travel", "Personal"]),

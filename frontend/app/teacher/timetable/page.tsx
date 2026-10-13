@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherTimetable() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.teacherSubjects().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherSubjects, () =>
+    api.teacherSubjects()
+  );
 
   const sections = rows.map((r) => r.section).filter(Boolean);
   const uniqueSections = Array.from(new Set(sections));
@@ -32,7 +26,7 @@ export default function TeacherTimetable() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-3">No subjects assigned.</td></tr>

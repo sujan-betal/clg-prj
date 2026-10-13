@@ -1,49 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission, { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminFees() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ course_id: "", head: "", amount: "", due_date: "" });
   usePermissionRefresh();
   const canManage = hasPermission("FEE_MANAGE");
+  const queryClient = useQueryClient();
 
-  function load() {
-    setLoading(true);
-    api.adminFees().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
-
-  useEffect(() => {
-    load();
-    api.adminCourses().then((res) => res.success && setCourses(res.data || []));
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminFees, () => api.adminFees());
+  const { data: courses = [] } = useApiQuery<any[]>(qk.adminCourses, () =>
+    api.adminCourses()
+  );
 
   const courseName = (id: string) => courses.find((c) => c.id === id)?.name || `Course #${id}`;
 
-  async function handleSubmit(e: React.FormEvent) {
+  const save = useMutation({
+    mutationFn: (payload: { course_id: string; head: string; amount: number; due_date?: string }) =>
+      api.adminCreateFee(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Fee created.");
+        setForm({ course_id: "", head: "", amount: "", due_date: "" });
+        queryClient.invalidateQueries({ queryKey: qk.adminFees });
+      } else {
+        setMessage(res.message || "Failed to create fee");
+      }
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.adminCreateFee({
+    save.mutate({
       course_id: form.course_id,
       head: form.head,
       amount: Number(form.amount),
       due_date: form.due_date || undefined,
     });
-    if (res.success) {
-      setMessage("Fee created.");
-      setForm({ course_id: "", head: "", amount: "", due_date: "" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to create fee");
-    }
   }
 
   return (
@@ -89,7 +88,7 @@ export default function AdminFees() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-3">No fee records.</td></tr>

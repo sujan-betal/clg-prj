@@ -9,8 +9,10 @@ RUN npm ci
 FROM node:20-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG API_PROXY_URL=http://backend:8000
+ENV API_PROXY_URL=$API_PROXY_URL
 COPY --from=frontend-deps /app/frontend/node_modules ./node_modules
 COPY frontend/ ./
 RUN npm run build

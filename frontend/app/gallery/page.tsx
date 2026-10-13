@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Gallery() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.publicGallery().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.gallery, () =>
+    api.publicGallery()
+  );
 
   return (
     <>
       <PageBanner kicker="CAMPUS LIFE" title="Gallery" text="A glimpse of our labs, fests, and the everyday life at AstraVidya." />
       <section className="mx-auto grid max-w-6xl grid-cols-2 gap-4 px-4 py-14 md:grid-cols-3">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm text-ink/50">Loading gallery...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No photos yet.</p>

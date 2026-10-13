@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
-export default function Courses() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type Course = {
+  id: string;
+  department_name?: string;
+  name: string;
+  code: string;
+  total_seats: number;
+  duration_years: number;
+  subjects_count?: number;
+  annual_fee: number;
+};
 
-  useEffect(() => {
-    api.publicCourses().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+export default function Courses() {
+  const { data: rows = [], isPending } = useApiQuery<Course[]>(qk.courses, () =>
+    api.publicCourses()
+  );
 
   return (
     <>
@@ -24,7 +29,7 @@ export default function Courses() {
         text="Industry-aligned programs with mandatory internships, live projects, and a credit system built for flexibility."
       />
       <section className="mx-auto grid max-w-6xl gap-4 px-4 py-14 md:grid-cols-2">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm text-ink/50">Loading courses...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No courses available yet.</p>

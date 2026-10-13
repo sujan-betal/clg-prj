@@ -1,28 +1,36 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk } from "@/lib/queries";
 
 export default function TeacherNotices() {
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [audience, setAudience] = useState("STUDENT");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const post = useMutation({
+    mutationFn: (payload: { title: string; content: string; audience: string }) =>
+      api.teacherPostNotice(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Notice posted.");
+        setTitle("");
+        setContent("");
+      } else {
+        setMessage(res.message || "Failed to post notice");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherNotices });
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setMessage("");
-    const res = await api.teacherPostNotice({ title, content, audience });
-    setLoading(false);
-    if (res.success) {
-      setMessage("Notice posted.");
-      setTitle("");
-      setContent("");
-    } else {
-      setMessage(res.message || "Failed to post notice");
-    }
+    post.mutate({ title, content, audience });
   }
 
   return (
@@ -37,8 +45,8 @@ export default function TeacherNotices() {
           <option value="TEACHER">Teachers</option>
           <option value="ALL">Everyone</option>
         </select>
-        <button disabled={loading} className="rounded-full bg-maroon px-6 py-2.5 font-semibold text-cream disabled:opacity-60">
-          {loading ? "Posting..." : "Post Notice"}
+        <button disabled={post.isPending} className="rounded-full bg-maroon px-6 py-2.5 font-semibold text-cream disabled:opacity-60">
+          {post.isPending ? "Posting..." : "Post Notice"}
         </button>
         {message && <p className="text-sm text-ink/70">{message}</p>}
       </form>

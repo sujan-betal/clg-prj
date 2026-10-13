@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function StudentCertificates() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.studentCertificates().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.studentCertificates, () =>
+    api.studentCertificates()
+  );
 
   const columns = [
     { key: "title", label: "Title" },
@@ -34,7 +28,7 @@ export default function StudentCertificates() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={3} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={3} className="px-4 py-3">No certificates.</td></tr>

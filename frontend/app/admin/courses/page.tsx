@@ -1,40 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission, { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminCourses() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ name: "", code: "", department_id: "", duration_years: "", total_seats: "", annual_fee: "" });
 const [dept, setDept] = useState({ name: "", code: "", description: "" });
   usePermissionRefresh();
   const canManage = hasPermission("COURSE_MANAGE");
+  const queryClient = useQueryClient();
 
-  function load() {
-    setLoading(true);
-    api.adminCourses().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminCourses, () =>
+    api.adminCourses()
+  );
+  const { data: departments = [] } = useApiQuery<any[]>(qk.adminDepartments, () =>
+    api.adminDepartments()
+  );
 
   const deptName = (id: string) => departments.find((d) => d.id === id)?.name || `Department #${id}`;
 
-  useEffect(() => {
-    load();
-    api.adminDepartments().then((res) => {
-      if (res.success) setDepartments(res.data || []);
-    });
-  }, []);
+  const save = useMutation({
+    mutationFn: (payload: {
+      name: string;
+      code: string;
+      department_id: string;
+      duration_years?: number;
+      total_seats?: number;
+      annual_fee?: number;
+    }) => api.adminCreateCourse(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Course created.");
+        setForm({ name: "", code: "", department_id: "", duration_years: "", total_seats: "", annual_fee: "" });
+        queryClient.invalidateQueries({ queryKey: qk.adminCourses });
+        queryClient.invalidateQueries({ queryKey: qk.adminDepartments });
+      } else {
+        setMessage(res.message || "Failed to create course");
+      }
+    },
+  });
 
-  async function handleSubmit(e: React.FormEvent) {
+  const createDept = useMutation({
+    mutationFn: (payload: { name: string; code: string; description?: string }) =>
+      api.adminCreateDepartment(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Department created.");
+        setDept({ name: "", code: "", description: "" });
+        queryClient.invalidateQueries({ queryKey: qk.adminDepartments });
+      } else {
+        setMessage(res.message || "Failed to create department");
+      }
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.adminCreateCourse({
+    save.mutate({
       name: form.name,
       code: form.code,
       department_id: form.department_id,
@@ -42,31 +69,16 @@ const [dept, setDept] = useState({ name: "", code: "", description: "" });
       total_seats: form.total_seats ? Number(form.total_seats) : undefined,
       annual_fee: form.annual_fee ? Number(form.annual_fee) : undefined,
     });
-    if (res.success) {
-      setMessage("Course created.");
-      setForm({ name: "", code: "", department_id: "", duration_years: "", total_seats: "", annual_fee: "" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to create course");
-    }
   }
 
-  async function handleDeptSubmit(e: React.FormEvent) {
+  function handleDeptSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.adminCreateDepartment({
+    createDept.mutate({
       name: dept.name,
       code: dept.code,
       description: dept.description || undefined,
     });
-    if (res.success) {
-      setMessage("Department created.");
-      setDept({ name: "", code: "", description: "" });
-      const dres = await api.adminDepartments();
-      if (dres.success) setDepartments(dres.data || []);
-    } else {
-      setMessage(res.message || "Failed to create department");
-    }
   }
 
   return (
@@ -117,7 +129,7 @@ const [dept, setDept] = useState({ name: "", code: "", description: "" });
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={6} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-3">No courses.</td></tr>

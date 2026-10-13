@@ -389,6 +389,22 @@ async def add_marks(db, user, payload):
     if exam_id is None:
         return api_response_error(message="Exam not found", status_code=StatusCode.notFound)
 
+    # One mark per student/exam/subject: re-posting the same cell overwrites
+    # the grade instead of silently adding a second row.
+    existing = (await db.execute(
+        select(Marks).where(
+            Marks.student_id == student_id,
+            Marks.exam_id == exam_id,
+            Marks.subject_id == subject_id,
+        )
+    )).scalar_one_or_none()
+    if existing:
+        existing.marks_obtained = payload.marks_obtained
+        existing.marks_total = payload.marks_total
+        existing.teacher_id = teacher.id
+        await db.commit()
+        return api_response_success(data={"id": existing.public_id}, message="Marks updated")
+
     m = Marks(
         student_id=student_id,
         exam_id=exam_id,

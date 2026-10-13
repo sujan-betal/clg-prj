@@ -1,28 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission, { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminLeave() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   usePermissionRefresh();
   const canManage = hasPermission("LEAVE_APPROVE");
+  const queryClient = useQueryClient();
 
-  function load() {
-    setLoading(true);
-    api.adminLeave().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminLeave, () =>
+    api.adminLeave()
+  );
 
-  useEffect(load, []);
+  const setStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.adminUpdateLeave(id, status),
+    onSuccess: (res) => {
+      if (res.success) {
+        queryClient.invalidateQueries({ queryKey: qk.adminLeave });
+      }
+    },
+  });
 
-  async function setStatus(id: string, status: string) {
-    const res = await api.adminUpdateLeave(id, status);
-    if (res.success) load();
+  function setStatus(id: string, status: string) {
+    setStatusMutation.mutate({ id, status });
   }
 
   return (
@@ -42,7 +45,7 @@ export default function AdminLeave() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={6} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-3">No leave requests.</td></tr>

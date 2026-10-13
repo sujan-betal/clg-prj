@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function StudentAttendance() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.studentAttendance().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.studentAttendance, () =>
+    api.studentAttendance()
+  );
 
   return (
     <>
@@ -28,7 +22,7 @@ export default function StudentAttendance() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={3} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={3} className="px-4 py-3">No attendance records.</td></tr>
@@ -42,7 +36,7 @@ export default function StudentAttendance() {
           </tbody>
         </table>
       </div>
-      {!loading && rows.length > 0 && <AttendanceSummary rows={rows} />}
+      {!isPending && rows.length > 0 && <AttendanceSummary rows={rows} />}
     </>
   );
 }

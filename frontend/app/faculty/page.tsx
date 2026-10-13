@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Faculty() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.publicFaculty().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.faculty, () =>
+    api.publicFaculty()
+  );
 
   return (
     <>
       <PageBanner kicker="OUR TEAM" title="Faculty" text="Educators and researchers, many published in top-tier journals and invited to global conferences." />
       <section className="mx-auto grid max-w-6xl gap-4 px-4 py-14 sm:grid-cols-2 md:grid-cols-3">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm text-ink/50">Loading faculty...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No faculty records yet.</p>

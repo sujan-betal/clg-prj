@@ -1,40 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Contact() {
-  const [content, setContent] = useState<Record<string, string>>({});
+  const { data: content = {}, isPending: contentLoading } = useApiQuery<
+    Record<string, string>
+  >(qk.siteContent, () => api.publicSiteContent());
   const [message, setMessage] = useState("");
-  const [contentLoading, setContentLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    api.publicSiteContent().then((res) => {
-      if (res.success) setContent(res.data || {});
-      setContentLoading(false);
-    });
-  }, []);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [body, setBody] = useState("");
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-    const res = await api.publicContact({ name, email, message: body });
-    setLoading(false);
-    if (res.success) {
-      setMessage(res.message);
-      setName("");
-      setEmail("");
-      setBody("");
-    } else {
+  const send = useMutation({
+    mutationFn: () => api.publicContact({ name, email, message: body }),
+    onSuccess: (res) => {
       setMessage(res.message || "Failed to send message");
-    }
+      if (res.success) {
+        setName("");
+        setEmail("");
+        setBody("");
+      }
+    },
+    onError: () => setMessage("Failed to send message"),
+  });
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage("");
+    send.mutate();
   }
 
   return (
@@ -47,7 +45,7 @@ export default function Contact() {
             <input required placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-ink/15 px-4 py-2.5" />
             <input required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-lg border border-ink/15 px-4 py-2.5" />
             <textarea rows={5} placeholder="Message" value={body} onChange={(e) => setBody(e.target.value)} className="w-full rounded-lg border border-ink/15 px-4 py-2.5" />
-            <button disabled={loading} className="rounded-full bg-maroon px-8 py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">{loading ? "Sending..." : "Send"}</button>
+            <button disabled={send.isPending} className="rounded-full bg-maroon px-8 py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">{send.isPending ? "Sending..." : "Send"}</button>
             {message && <p className="text-sm text-ink/70">{message}</p>}
           </form>
         </div>

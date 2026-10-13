@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 import { api, saveSession } from "@/lib/api";
 
 const roleHome: Record<string, string> = {
@@ -19,7 +20,33 @@ function SetPasswordForm() {
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+
+  const savePassword = useMutation({
+    mutationFn: () => api.setPassword(token, password, confirm),
+    onSuccess: (res) => {
+      if (!res.success) {
+        setError(res.message || "Could not set your password.");
+        return;
+      }
+
+      const data = res.data || {};
+      if (data.access_token) {
+        // Signed in already, so go straight to the dashboard.
+        saveSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || "",
+          role: data.role || "STUDENT",
+          username: data.username || "",
+          permissions: [],
+        });
+        router.replace(roleHome[(data.role || "").toUpperCase()] || "/login");
+        return;
+      }
+
+      setMessage("Password set. Redirecting to login...");
+      setTimeout(() => router.replace("/login"), 1500);
+    },
+  });
 
   useEffect(() => {
     if (!token) {
@@ -29,7 +56,7 @@ function SetPasswordForm() {
     }
   }, [token]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setMessage("");
@@ -47,31 +74,7 @@ function SetPasswordForm() {
       return;
     }
 
-    setLoading(true);
-    const res = await api.setPassword(token, password, confirm);
-    setLoading(false);
-
-    if (!res.success) {
-      setError(res.message || "Could not set your password.");
-      return;
-    }
-
-    const data = res.data || {};
-    if (data.access_token) {
-      // Signed in already, so go straight to the dashboard.
-      saveSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token || "",
-        role: data.role || "STUDENT",
-        username: data.username || "",
-        permissions: [],
-      });
-      router.replace(roleHome[(data.role || "").toUpperCase()] || "/login");
-      return;
-    }
-
-    setMessage("Password set. Redirecting to login...");
-    setTimeout(() => router.replace("/login"), 1500);
+    savePassword.mutate();
   }
 
   if (!token) {
@@ -142,10 +145,10 @@ function SetPasswordForm() {
           {message && <p className="text-sm text-emerald-700">{message}</p>}
 
           <button
-            disabled={loading}
+            disabled={savePassword.isPending}
             className="w-full rounded-full bg-maroon py-3 font-semibold text-cream transition disabled:opacity-60"
           >
-            {loading ? "Saving..." : "Save password and continue"}
+            {savePassword.isPending ? "Saving..." : "Save password and continue"}
           </button>
         </form>
       </div>

@@ -1,37 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function Home() {
-  const [home, setHome] = useState<any>(null);
-  const [notices, setNotices] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const home = useApiQuery<any>(qk.home, () => api.publicHome());
+  const notices = useApiQuery<any[]>(qk.notices, () => api.publicNotices());
+  const events = useApiQuery<any[]>(qk.events, () => api.publicEvents());
 
-  useEffect(() => {
-    Promise.all([
-      api.publicHome(),
-      api.publicNotices(),
-      api.publicEvents(),
-    ]).then(([homeRes, noticeRes, eventRes]) => {
-      if (homeRes.success) setHome(homeRes.data);
-      if (noticeRes.success) setNotices((noticeRes.data || []).slice(0, 4));
-      if (eventRes.success) setEvents((eventRes.data || []).slice(0, 4));
-      setLoading(false);
-    });
-  }, []);
-
-  const ticker = notices.length > 0
-    ? notices.map((n) => n.title)
+  const tickerItems = notices.data?.length
+    ? notices.data.slice(0, 4).map((n) => n.title)
     : ["Welcome to AstraVidya Institute of Technology"];
 
+  const topNotices = (notices.data || []).slice(0, 4);
+  const topEvents = (events.data || []).slice(0, 4);
+
+  const ticker = tickerItems;
+
   const stats = [
-    { n: String(home?.stats?.students ?? "-"), l: "Students" },
-    { n: String(home?.stats?.programs ?? "-"), l: "Programs" },
-    { n: String(home?.stats?.faculty ?? "-"), l: "Faculty" },
-    { n: String(home?.established ?? "-"), l: "Est." },
+    { n: String(home.data?.stats?.students ?? "-"), l: "Students" },
+    { n: String(home.data?.stats?.programs ?? "-"), l: "Programs" },
+    { n: String(home.data?.stats?.faculty ?? "-"), l: "Faculty" },
+    { n: String(home.data?.established ?? "-"), l: "Est." },
   ];
 
   return (
@@ -52,7 +43,7 @@ export default function Home() {
             NAAC A++ · ADMISSIONS OPEN
           </p>
           <h1 className="mt-6 font-display text-4xl font-black leading-tight sm:text-5xl md:text-7xl">
-            {home?.slogan?.split(",").map((part: string, i: number) => (
+            {home.data?.slogan?.split(",").map((part: string, i: number) => (
               <span key={i}>
                 {part.trim()}
                 <br />
@@ -60,7 +51,7 @@ export default function Home() {
             ))}
           </h1>
           <p className="mt-6 max-w-xl text-lg text-white/90">
-            {home?.college_name || "AstraVidya Institute of Technology"} — rigorous
+            {home.data?.college_name || "AstraVidya Institute of Technology"} — rigorous
             academics with hands-on labs, research culture, and industry projects.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
@@ -83,11 +74,18 @@ export default function Home() {
       {/* Stats */}
       <section className="dot-grid">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-14 md:grid-cols-4">
-          {loading ? (
+          {home.isPending ? (
             [0, 1, 2, 3].map((i) => (
               <div key={i} className="rounded-2xl border-b-4 border-saffron/30 bg-white p-5 text-center shadow-sm">
                 <p className="font-display text-4xl font-black text-ink/20">-</p>
                 <p className="mt-1 text-sm tracking-widest text-ink/40">Loading</p>
+              </div>
+            ))
+          ) : home.isError ? (
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl border-b-4 border-red-400/40 bg-white p-5 text-center shadow-sm">
+                <p className="font-display text-4xl font-black text-red-500/70">!</p>
+                <p className="mt-1 text-sm tracking-widest text-ink/40">API unreachable</p>
               </div>
             ))
           ) : (
@@ -105,12 +103,12 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-4 pb-16">
         <h2 className="font-display text-3xl font-bold">Latest Notices & Events</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {[...notices.map((n) => ({ title: n.title, tag: "Notice" })),
-            ...events.map((e) => ({ title: e.title, tag: "Event" }))].length === 0 ? (
+          {[...topNotices.map((n) => ({ title: n.title, tag: "Notice" })),
+            ...topEvents.map((e) => ({ title: e.title, tag: "Event" }))].length === 0 ? (
             <p className="text-sm text-ink/50">Nothing published yet.</p>
           ) : (
-            [...notices.map((n) => ({ title: n.title, tag: "Notice" })),
-             ...events.map((e) => ({ title: e.title, tag: "Event" }))].map((h, i) => (
+            [...topNotices.map((n) => ({ title: n.title, tag: "Notice" })),
+             ...topEvents.map((e) => ({ title: e.title, tag: "Event" }))].map((h, i) => (
               <div
                 key={i}
                 className="rounded-2xl border-l-4 border-maroon bg-white p-6 shadow-sm hover:-translate-y-1 hover:shadow-lg transition"

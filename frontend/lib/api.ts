@@ -1,40 +1,37 @@
+import {
+  getAccessToken,
+  getRefreshToken,
+  getSession,
+  useAuthStore,
+  type Session,
+} from "@/lib/auth-store";
+
+export {
+  getAccessToken,
+  getRefreshToken,
+  getPermissions,
+  getRole,
+  getUsername,
+  hasPermission,
+} from "@/lib/auth-store";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const TOKEN_KEY = "access_token";
-const REFRESH_KEY = "refresh_token";
-const ROLE_KEY = "role";
-const USERNAME_KEY = "username";
-const PERMS_KEY = "permissions";
-
-export function saveSession(data: {
-  access_token: string;
-  refresh_token: string;
-  role: string;
-  username: string;
-  permissions?: string[];
-}) {
-  localStorage.setItem(TOKEN_KEY, data.access_token);
-  localStorage.setItem(REFRESH_KEY, data.refresh_token);
-  localStorage.setItem(ROLE_KEY, data.role);
-  localStorage.setItem(USERNAME_KEY, data.username);
-  localStorage.setItem(PERMS_KEY, JSON.stringify(data.permissions || []));
-}
-
-export function getPermissions(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(PERMS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-export function hasPermission(code: string): boolean {
-  const perms = getPermissions();
-  return perms.includes("ALL") || perms.includes(code.toUpperCase());
-}
-
 export const PERMS_UPDATED_EVENT = "permissions-updated";
+
+export function saveSession(data: Session) {
+  useAuthStore.getState().setSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    role: data.role,
+    username: data.username,
+    permissions: data.permissions || [],
+  });
+}
+
+export function clearSession() {
+  useAuthStore.getState().clear();
+}
 
 // Re-fetch own permissions from the server so that changes made by an
 // admin (or a role update) apply without forcing the user to log in again.
@@ -43,40 +40,22 @@ export async function refreshPermissions(): Promise<string[]> {
     const res = await apiFetch("/api/auth/me");
     if (res?.success && res.data && typeof window !== "undefined") {
       const perms: string[] = res.data.permissions || [];
-      localStorage.setItem(PERMS_KEY, JSON.stringify(perms));
-      if (res.data.role) localStorage.setItem(ROLE_KEY, res.data.role);
-      if (res.data.username) localStorage.setItem(USERNAME_KEY, res.data.username);
+      useAuthStore.getState().patchSession({
+        permissions: perms,
+        role: res.data.role || getSession()?.role || "",
+        username: res.data.username || getSession()?.username || "",
+      });
       window.dispatchEvent(new Event(PERMS_UPDATED_EVENT));
       return perms;
     }
   } catch {
     // Network/parse failure — keep the cached permissions.
   }
-  return getPermissions();
-}
-
-export function clearSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(ROLE_KEY);
-  localStorage.removeItem(USERNAME_KEY);
-  localStorage.removeItem(PERMS_KEY);
-}
-
-export function getAccessToken() {
-  return typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY);
-}
-
-export function getRole() {
-  return typeof window === "undefined" ? null : localStorage.getItem(ROLE_KEY);
-}
-
-export function getUsername() {
-  return typeof window === "undefined" ? null : localStorage.getItem(USERNAME_KEY);
+  return getSession()?.permissions ?? [];
 }
 
 async function tryRefresh(): Promise<string | null> {
-  const refresh_token = localStorage.getItem(REFRESH_KEY);
+  const refresh_token = getRefreshToken();
   if (!refresh_token) return null;
   try {
     const res = await fetch(`${API_BASE}/api/auth/refresh`, {
@@ -86,8 +65,10 @@ async function tryRefresh(): Promise<string | null> {
     });
     const json = await res.json();
     if (json.success && json.data?.access_token) {
-      localStorage.setItem(TOKEN_KEY, json.data.access_token);
-      localStorage.setItem(REFRESH_KEY, json.data.refresh_token);
+      useAuthStore.getState().patchSession({
+        access_token: json.data.access_token,
+        refresh_token: json.data.refresh_token,
+      });
       return json.data.access_token;
     }
   } catch {
@@ -196,6 +177,9 @@ export const api = {
   studentMaterials: () => apiFetch("/api/student/materials"),
   studentAssignments: () => apiFetch("/api/student/assignments"),
   studentCertificates: () => apiFetch("/api/student/certificates"),
+  studentLeave: () => apiFetch("/api/student/leave"),
+  studentApplyLeave: (payload: { from_date: string; to_date: string; reason?: string }) =>
+    apiFetch("/api/student/leave", { method: "POST", body: payload }),
 
   teacherStudents: () => apiFetch("/api/teacher/students"),
   teacherExams: () => apiFetch("/api/teacher/exams"),

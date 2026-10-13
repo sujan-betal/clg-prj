@@ -2,18 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useSession } from "@/lib/auth-store";
 
 export default function ChangePassword() {
   const router = useRouter();
+  const session = useSession();
   const [current_password, setCurrent] = useState("");
   const [new_password, setNew] = useState("");
   const [confirm_password, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const changePassword = useMutation({
+    mutationFn: () =>
+      api.changePassword(current_password, new_password, confirm_password),
+    onSuccess: (res) => {
+      if (!res.success) {
+        setError(res.message || "Failed to change password");
+        return;
+      }
+      setMessage("Password changed. Redirecting...");
+      setTimeout(() => {
+        const role = (session?.role || "").toUpperCase();
+        if (role === "ADMIN") router.replace("/admin");
+        else if (role === "TEACHER") router.replace("/teacher");
+        else router.replace("/student");
+      }, 800);
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setMessage("");
@@ -21,20 +41,7 @@ export default function ChangePassword() {
       setError("Passwords do not match");
       return;
     }
-    setLoading(true);
-    const res = await api.changePassword(current_password, new_password, confirm_password);
-    setLoading(false);
-    if (!res.success) {
-      setError(res.message || "Failed to change password");
-      return;
-    }
-    setMessage("Password changed. Redirecting...");
-    setTimeout(() => {
-      const role = (localStorage.getItem("role") || "").toUpperCase();
-      if (role === "ADMIN") router.replace("/admin");
-      else if (role === "TEACHER") router.replace("/teacher");
-      else router.replace("/student");
-    }, 800);
+    changePassword.mutate();
   }
 
   return (
@@ -47,8 +54,8 @@ export default function ChangePassword() {
           <input required type="password" placeholder="Confirm new password" value={confirm_password} onChange={(e) => setConfirm(e.target.value)} className="w-full rounded-lg border border-ink/15 px-4 py-2.5" />
           {error && <p className="text-sm text-red-600">{error}</p>}
           {message && <p className="text-sm text-green-700">{message}</p>}
-          <button disabled={loading} className="w-full rounded-full bg-maroon py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">
-            {loading ? "Updating..." : "Update Password"}
+          <button disabled={changePassword.isPending} className="w-full rounded-full bg-maroon py-3 font-semibold text-cream hover:bg-maroon-dark transition disabled:opacity-60">
+            {changePassword.isPending ? "Updating..." : "Update Password"}
           </button>
         </form>
       </div>

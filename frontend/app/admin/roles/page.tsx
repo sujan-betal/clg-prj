@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import { usePermissionRefresh } from "@/components/RequirePermission";
 
 type Role = {
@@ -14,8 +16,6 @@ type Role = {
 };
 
 export default function AdminRoles() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -23,18 +23,49 @@ export default function AdminRoles() {
   const [editing, setEditing] = useState<Role | null>(null);
 
   usePermissionRefresh();
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await api.adminRoles();
-    setLoading(false);
-    if (res.success) setRoles(res.data || []);
-    else setMessage(res.message || "Failed to load roles");
-  }, []);
+  const { data: roles = [], isPending } = useApiQuery<Role[]>(qk.roles, () => api.adminRoles());
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const save = useMutation({
+    mutationFn: (payload: {
+      editingId: string | null;
+      name: string;
+      description: string;
+      is_admin: boolean;
+    }) =>
+      payload.editingId
+        ? api.adminUpdateRole(payload.editingId, {
+            description: payload.description,
+            is_admin: payload.is_admin,
+          })
+        : api.adminCreateRole({
+            name: payload.name,
+            description: payload.description,
+            is_admin: payload.is_admin,
+          }),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message || "Saved");
+        resetForm();
+        queryClient.invalidateQueries({ queryKey: qk.roles });
+      } else {
+        setMessage(res.message || "Failed to save role");
+      }
+    },
+  });
+
+  const removeRole = useMutation({
+    mutationFn: (id: string) => api.adminDeleteRole(id),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message || "Role deleted");
+        queryClient.invalidateQueries({ queryKey: qk.roles });
+      } else {
+        setMessage(res.message || "Failed to delete role");
+      }
+    },
+  });
 
   function resetForm() {
     setName("");
@@ -50,32 +81,20 @@ export default function AdminRoles() {
     setIsAdmin(r.is_admin);
   }
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-
-    const res = editing
-      ? await api.adminUpdateRole(editing.id, { description, is_admin: isAdmin })
-      : await api.adminCreateRole({ name, description, is_admin: isAdmin });
-
-    if (res.success) {
-      setMessage(res.message || "Saved");
-      resetForm();
-      load();
-    } else {
-      setMessage(res.message || "Failed to save role");
-    }
+    save.mutate({
+      editingId: editing ? editing.id : null,
+      name,
+      description,
+      is_admin: isAdmin,
+    });
   }
 
-  async function remove(r: Role) {
+  function remove(r: Role) {
     if (!confirm(`Delete role "${r.name}"?`)) return;
-    const res = await api.adminDeleteRole(r.id);
-    if (res.success) {
-      setMessage(res.message || "Role deleted");
-      load();
-    } else {
-      setMessage(res.message || "Failed to delete role");
-    }
+    removeRole.mutate(r.id);
   }
 
   return (
@@ -129,7 +148,7 @@ export default function AdminRoles() {
       {message && <p className="mt-3 text-sm text-ink/70">{message}</p>}
 
       <div className="mt-4 space-y-2">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm">Loading...</p>
         ) : roles.length === 0 ? (
           <p className="text-sm text-ink/50">No roles yet.</p>

@@ -1,48 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherMaterials() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherMaterials, () =>
+    api.teacherMaterials()
+  );
+  const { data: subjects = [] } = useApiQuery<any[]>(qk.teacherSubjects, () => api.teacherSubjects());
   const [title, setTitle] = useState("");
   const [subject_id, setSubjectId] = useState("");
   const [file_url, setFileUrl] = useState("");
   const [file_type, setFileType] = useState("");
   const [message, setMessage] = useState("");
 
-  async function load() {
-    const res = await api.teacherMaterials();
-    if (res.success) setRows(res.data || []);
-    setLoading(false);
-  }
+  const add = useMutation({
+    mutationFn: (payload: { title: string; subject_id: string; file_url?: string; file_type?: string }) =>
+      api.teacherAddMaterial(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message);
+        setTitle("");
+        setSubjectId("");
+        setFileUrl("");
+        setFileType("");
+      } else {
+        setMessage(res.message || "Failed to add material");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherMaterials });
+    },
+  });
 
-  useEffect(() => {
-    load();
-    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
-  }, []);
-
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherAddMaterial({
+    add.mutate({
       title,
-       subject_id,
+      subject_id,
       file_url: file_url || undefined,
       file_type: file_type || undefined,
     });
-    if (res.success) {
-      setMessage(res.message);
-      setTitle("");
-      setSubjectId("");
-      setFileUrl("");
-      setFileType("");
-      load();
-    } else {
-      setMessage(res.message || "Failed to add material");
-    }
   }
 
   const columns = ["title", "subject_name", "file_type", "file_url"];
@@ -76,7 +76,7 @@ export default function TeacherMaterials() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-3">No materials uploaded.</td></tr>

@@ -1,23 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission from "@/components/RequirePermission";
 
 export default function AdminContent() {
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.adminContent().then((res) => {
-      if (res.success) {
-        setMaterials(res.data?.materials || []);
-        setAssignments(res.data?.assignments || []);
-      }
-      setLoading(false);
-    });
-  }, []);
+  const { data, isPending } = useApiQuery<{ materials?: any[]; assignments?: any[] }>(
+    qk.adminContent,
+    () => api.adminContent()
+  );
+  const materials = data?.materials || [];
+  const assignments = data?.assignments || [];
 
   function renderTable(rows: any[], label: string) {
     return (
@@ -31,7 +24,7 @@ export default function AdminContent() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={3} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={3} className="px-4 py-3">No {label}.</td></tr>

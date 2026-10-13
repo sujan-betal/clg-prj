@@ -1,61 +1,67 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, getUsername } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useSession } from "@/lib/auth-store";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function StudentOverview() {
-  const [profile, setProfile] = useState<any>(null);
-  const [counts, setCounts] = useState({ notices: 0, attendance: 0, marks: 0, materials: 0 });
+  const session = useSession();
+  const queryClient = useQueryClient();
+
+  const { data: profile = null } = useApiQuery<any>(qk.studentProfile, () => api.studentProfile());
+  const { data: notices = [] } = useApiQuery<any[]>(qk.studentNotices, () => api.studentNotices());
+  const { data: attendance = [] } = useApiQuery<any[]>(qk.studentAttendance, () => api.studentAttendance());
+  const { data: marks = [] } = useApiQuery<any[]>(qk.studentMarks, () => api.studentMarks());
+  const { data: materials = [] } = useApiQuery<any[]>(qk.studentMaterials, () => api.studentMaterials());
+
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ guardian_phone: "", section: "" });
   const [message, setMessage] = useState("");
 
-  function applyProfile(res: any) {
-    if (res?.success && res.data) {
-      setProfile(res.data);
-      setForm({
-        guardian_phone: res.data.guardian_phone || "",
-        section: res.data.section || "",
-      });
-    }
-  }
+  const counts = {
+    notices: notices.length,
+    attendance: attendance.length,
+    marks: marks.length,
+    materials: materials.length,
+  };
 
   useEffect(() => {
-    api.studentProfile().then(applyProfile);
-    Promise.all([
-      api.studentNotices(),
-      api.studentAttendance(),
-      api.studentMarks(),
-      api.studentMaterials(),
-    ]).then(([notices, attendance, marks, materials]) => {
-      setCounts({
-        notices: (notices.data || []).length,
-        attendance: (attendance.data || []).length,
-        marks: (marks.data || []).length,
-        materials: (materials.data || []).length,
+    if (profile) {
+      setForm({
+        guardian_phone: profile.guardian_phone || "",
+        section: profile.section || "",
       });
-    });
-  }, []);
+    }
+  }, [profile]);
 
-  async function save(e: React.FormEvent) {
+  const save = useMutation({
+    mutationFn: (payload: { guardian_phone?: string; section?: string }) =>
+      api.studentUpdateProfile(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message || "Profile updated");
+        setEditing(false);
+      } else {
+        setMessage(res.message || "Failed to update profile");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.studentProfile });
+    },
+  });
+
+  function onSave(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.studentUpdateProfile({
+    save.mutate({
       guardian_phone: form.guardian_phone || undefined,
       section: form.section || undefined,
     });
-    if (res.success) {
-      setMessage(res.message || "Profile updated");
-      setEditing(false);
-      api.studentProfile().then(applyProfile);
-    } else {
-      setMessage(res.message || "Failed to update profile");
-    }
   }
 
   return (
     <>
-      <h1 className="font-display text-3xl font-black text-maroon">Hi, {getUsername() || "Student"}</h1>
+      <h1 className="font-display text-3xl font-black text-maroon">Hi, {session?.username || "Student"}</h1>
       <p className="mt-1 text-ink/60">
         {profile
           ? `${profile.course_name || "Not enrolled"} · Semester ${profile.semester} · Section ${profile.section || "-"} · Roll ${profile.roll_no}`
@@ -108,7 +114,7 @@ export default function StudentOverview() {
       {message && <p className="mt-3 text-sm text-ink/70">{message}</p>}
 
       {editing && (
-        <form onSubmit={save} className="mt-3 flex flex-wrap items-end gap-3 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
+        <form onSubmit={onSave} className="mt-3 flex flex-wrap items-end gap-3 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
           <label className="text-xs text-ink/60">
             Guardian phone
             <input

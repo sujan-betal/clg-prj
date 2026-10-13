@@ -1,49 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, getUsername } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useSession } from "@/lib/auth-store";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherOverview() {
-  const [profile, setProfile] = useState<any>(null);
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const session = useSession();
+  const { data: profile } = useApiQuery<any>(qk.teacherProfile, () => api.teacherProfile());
+  const { data: subjects = [] } = useApiQuery<any[]>(qk.teacherSubjects, () => api.teacherSubjects());
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ designation: "", department_id: "" });
   const [message, setMessage] = useState("");
 
-  function applyProfile(res: any) {
-    if (res?.success && res.data) {
-      setProfile(res.data);
+  useEffect(() => {
+    if (profile) {
       setForm({
-        designation: res.data.designation || "",
-        department_id: res.data.department_id ?? "",
+        designation: profile.designation || "",
+        department_id: profile.department_id ?? "",
       });
     }
-  }
+  }, [profile]);
 
-  useEffect(() => {
-    api.teacherProfile().then(applyProfile);
-    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
-  }, []);
+  const update = useMutation({
+    mutationFn: (payload: { designation?: string; department_id?: string }) =>
+      api.teacherUpdateProfile(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message || "Profile updated");
+        setEditing(false);
+      } else {
+        setMessage(res.message || "Failed to update profile");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherProfile });
+    },
+  });
 
-  async function save(e: React.FormEvent) {
+  function save(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherUpdateProfile({
+    update.mutate({
       designation: form.designation || undefined,
       department_id: form.department_id || undefined,
     });
-    if (res.success) {
-      setMessage(res.message || "Profile updated");
-      setEditing(false);
-      api.teacherProfile().then(applyProfile);
-    } else {
-      setMessage(res.message || "Failed to update profile");
-    }
   }
 
   return (
     <>
-      <h1 className="font-display text-3xl font-black text-maroon">Welcome, {getUsername() || "Teacher"}</h1>
+      <h1 className="font-display text-3xl font-black text-maroon">Welcome, {session?.username || "Teacher"}</h1>
 <p className="mt-1 text-ink/60">
         {profile
           ? `${profile.designation || "Faculty"} · ${profile.department_name || "No department"} · ${profile.employee_id}`

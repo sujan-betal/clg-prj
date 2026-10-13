@@ -1,28 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import RequirePermission, { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function AdminAdmissions() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   usePermissionRefresh();
   const canManage = hasPermission("ADMISSION_MANAGE");
+  const queryClient = useQueryClient();
 
-  function load() {
-    setLoading(true);
-    api.adminAdmissions().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.adminAdmissions, () =>
+    api.adminAdmissions()
+  );
 
-  useEffect(load, []);
+  const setStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.adminUpdateAdmission(id, status),
+    onSuccess: (res) => {
+      if (res.success) {
+        queryClient.invalidateQueries({ queryKey: qk.adminAdmissions });
+      }
+    },
+  });
 
-  async function setStatus(id: string, status: string) {
-    const res = await api.adminUpdateAdmission(id, status);
-    if (res.success) load();
+  function setStatus(id: string, status: string) {
+    setStatusMutation.mutate({ id, status });
   }
 
   return (
@@ -41,7 +44,7 @@ export default function AdminAdmissions() {
               </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={5} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-3">No admissions applications.</td></tr>

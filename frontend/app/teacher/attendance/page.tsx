@@ -1,39 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherAttendance() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ student_id: "", subject_id: "", date: "", status: "PRESENT" });
-  const [message, setMessage] = useState("");
-
+  const queryClient = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  function load() {
-    setLoading(true);
-    api.teacherAttendance().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherAttendance, () =>
+    api.teacherAttendance()
+  );
+  const { data: students = [] } = useApiQuery<any[]>(qk.teacherStudents, () => api.teacherStudents());
+  const { data: subjects = [] } = useApiQuery<any[]>(qk.teacherSubjects, () => api.teacherSubjects());
+  const [form, setForm] = useState({ student_id: "", subject_id: "", date: today, status: "PRESENT" });
+  const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    load();
-    api.teacherStudents().then((res) => res.success && setStudents(res.data || []));
-    api.teacherSubjects().then((res) => {
-      if (res.success) setSubjects(res.data || []);
-    });
-    setForm((f) => ({ ...f, date: today }));
-  }, []);
+  const save = useMutation({
+    mutationFn: (records: { student_id: string; subject_id: string; date: string; status: string }[]) =>
+      api.teacherMarkAttendance(records),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Attendance saved.");
+      } else {
+        setMessage(res.message || "Could not save attendance.");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherAttendance });
+    },
+  });
 
-  async function mark(e: React.FormEvent) {
+  function mark(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherMarkAttendance([
+    save.mutate([
       {
         student_id: form.student_id,
         subject_id: form.subject_id,
@@ -41,12 +41,6 @@ export default function TeacherAttendance() {
         status: form.status,
       },
     ]);
-    if (res.success) {
-      setMessage("Attendance saved.");
-      load();
-    } else {
-      setMessage(res.message || "Could not save attendance.");
-    }
   }
 
   return (
@@ -149,7 +143,7 @@ export default function TeacherAttendance() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr>
                 <td colSpan={4} className="px-4 py-3">Loading...</td>
               </tr>

@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, hasPermission } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PermissionInput from "@/components/PermissionInput";
 import { usePermissionRefresh } from "@/components/RequirePermission";
 
 export default function UsersAdminTable({ role, title }: { role: string; title: string }) {
   usePermissionRefresh();
-  const [users, setUsers] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [username, setUsername] = useState("");
@@ -16,11 +16,8 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
   const [designation, setDesignation] = useState("");
   const [message, setMessage] = useState("");
   const [createdLink, setCreatedLink] = useState("");
-  const [loading, setLoading] = useState(false);
   const pageSize = 10;
 
-  const [permNames, setPermNames] = useState<string[]>([]);
-  const [roles, setRoles] = useState<{ id: string; name: string; is_admin: boolean }[]>([]);
   const [createPerms, setCreatePerms] = useState<string[]>([]);
   const [newRole, setNewRole] = useState(role);
 
@@ -30,89 +27,130 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
   const canGrant = hasPermission("ALL") || hasPermission("USER_UPDATE");
   const canCreate = hasPermission("ALL") || hasPermission("USER_CREATE");
   const canDelete = hasPermission("ALL") || hasPermission("USER_DELETE");
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await api.adminUsers({ page, page_size: pageSize, search, role });
-    setLoading(false);
-    if (res.success) {
-      setUsers(res.data || []);
-      setTotal(res.pagination?.total || 0);
-    } else {
-      setMessage(res.message || "Failed to load users");
+  const usersQuery = { page, page_size: pageSize, search, role };
+
+  const { data: userPage, isPending } = useApiQuery<{ users: any[]; total: number }>(
+    qk.adminUsers(usersQuery),
+    async () => {
+      const res = await api.adminUsers(usersQuery);
+      return {
+        success: true,
+        data: {
+          users: res.data || [],
+          total: res.pagination?.total || 0,
+        },
+      };
     }
-  }, [page, search, role]);
+  );
+  const users = userPage?.users ?? [];
+  const total = userPage?.total ?? 0;
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data: permNames = [] } = useApiQuery<string[]>(qk.permissionNames, () =>
+    api.adminPermissions()
+  );
+  const { data: roles = [] } = useApiQuery<{ id: string; name: string; is_admin: boolean }[]>(
+    qk.roles,
+    () => api.adminRoles()
+  );
 
-  useEffect(() => {
-    api.adminPermissions().then((res) => {
-      if (res.success) setPermNames(res.data || []);
-    });
-    api.adminRoles().then((res) => {
-      if (res.success) setRoles(res.data || []);
-    });
-  }, []);
+  const createUser = useMutation({
+    mutationFn: (payload: {
+      username: string;
+      email?: string;
+      role?: string;
+      designation?: string;
+      permissions?: string[];
+    }) => api.adminCreateUser(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage(res.message);
+        setCreatedLink((res.data as any)?.set_password_url || "");
+        setUsername("");
+        setEmail("");
+        setDesignation("");
+        setCreatePerms([]);
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      } else {
+        setMessage(res.message || "Failed to create user");
+      }
+    },
+  });
 
-  async function createUser(e: React.FormEvent) {
+  const updateStatus = useMutation({
+    mutationFn: ({ userid, status }: { userid: string; status: string }) =>
+      api.adminUpdateUserStatus(userid, status),
+    onSuccess: (res) => {
+      if (res.success) queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      else setMessage(res.message);
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: (userid: string) => api.adminDeleteUser(userid),
+    onSuccess: (res) => {
+      if (res.success) queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      else setMessage(res.message);
+    },
+  });
+
+  const loadPermissions = useMutation({
+    mutationFn: ({ user }: { user: any }) => api.adminUserPermissions(user.userid),
+    onSuccess: (res, vars) => {
+      if (!res.success) {
+        setMessage(res.message || "Failed to load permissions");
+        return;
+      }
+      setEditing(vars.user);
+      setEditPerms(res.data || []);
+    },
+  });
+
+  const savePermissions = useMutation({
+    mutationFn: ({ userid, permissions }: { userid: string; permissions: string[] }) =>
+      api.adminSetUserPermissions(userid, permissions),
+    onSuccess: (res, vars) => {
+      if (res.success) {
+        setMessage(`Permissions updated for ${editing.username}`);
+        setEditing(null);
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+        queryClient.invalidateQueries({ queryKey: qk.permissionNames });
+      } else {
+        setMessage(res.message || "Failed to update permissions");
+      }
+    },
+  });
+
+  function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.adminCreateUser({
+    createUser.mutate({
       username,
       email: email || undefined,
       role: newRole,
       designation: newRole === "TEACHER" && designation ? designation : undefined,
       permissions: canGrant ? createPerms : undefined,
     });
-    if (res.success) {
-      setMessage(res.message);
-      setCreatedLink((res.data as any)?.set_password_url || "");
-      setUsername("");
-      setEmail("");
-      setDesignation("");
-      setCreatePerms([]);
-      load();
-    } else {
-      setMessage(res.message || "Failed to create user");
-    }
   }
 
-  async function toggleStatus(u: any) {
+  function toggleStatus(u: any) {
     const next = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    const res = await api.adminUpdateUserStatus(u.userid, next);
-    if (res.success) load();
-    else setMessage(res.message);
+    updateStatus.mutate({ userid: u.userid, status: next });
   }
 
-  async function remove(u: any) {
+  function remove(u: any) {
     if (!confirm(`Delete ${u.username}?`)) return;
-    const res = await api.adminDeleteUser(u.userid);
-    if (res.success) load();
-    else setMessage(res.message);
+    deleteUser.mutate(u.userid);
   }
 
-  async function openPermissions(u: any) {
+  function openPermissions(u: any) {
     setMessage("");
-    const res = await api.adminUserPermissions(u.userid);
-    if (!res.success) {
-      setMessage(res.message || "Failed to load permissions");
-      return;
-    }
-    setEditing(u);
-    setEditPerms(res.data || []);
+    loadPermissions.mutate({ user: u });
   }
 
-  async function savePermissions() {
-    const res = await api.adminSetUserPermissions(editing.userid, editPerms);
-    if (res.success) {
-      setMessage(`Permissions updated for ${editing.username}`);
-      setEditing(null);
-      load();
-    } else {
-      setMessage(res.message || "Failed to update permissions");
-    }
+  function handleSavePermissions() {
+    savePermissions.mutate({ userid: editing.userid, permissions: editPerms });
   }
 
   return (
@@ -120,7 +158,7 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
       <h1 className="font-display text-3xl font-black text-maroon">{title}</h1>
 
       {canCreate ? (
-        <form onSubmit={createUser} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
+        <form onSubmit={handleCreateUser} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
           <input required placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
           <input placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-ink/15 px-3 py-2 text-sm" />
           {role === "TEACHER" && (
@@ -175,7 +213,7 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={6} className="px-4 py-3">Loading...</td></tr>
             ) : users.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-3">No users found.</td></tr>
@@ -247,7 +285,7 @@ export default function UsersAdminTable({ role, title }: { role: string; title: 
             </div>
             <div className="mt-4 flex justify-end gap-3">
               <button onClick={() => setEditing(null)} className="rounded-full border border-ink/15 px-4 py-2 text-sm">Cancel</button>
-              <button onClick={savePermissions} className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream">Save</button>
+              <button onClick={handleSavePermissions} className="rounded-full bg-maroon px-4 py-2 text-sm font-semibold text-cream">Save</button>
             </div>
           </div>
         </div>

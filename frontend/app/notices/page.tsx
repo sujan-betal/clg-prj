@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 import PageBanner from "@/components/PageBanner";
 
 export default function Notices() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.publicNotices().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }, []);
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.notices, () =>
+    api.publicNotices()
+  );
 
   return (
     <>
       <PageBanner kicker="ANNOUNCEMENTS" title="Notices & News" text="Official announcements for students, parents, and staff — updated daily." />
       <section className="mx-auto max-w-4xl px-4 py-14">
-        {loading ? (
+        {isPending ? (
           <p className="text-sm text-ink/50">Loading notices...</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-ink/50">No notices published.</p>

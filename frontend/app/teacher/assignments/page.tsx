@@ -1,45 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherAssignments() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherAssignments, () =>
+    api.teacherAssignments()
+  );
+  const { data: subjects = [] } = useApiQuery<any[]>(qk.teacherSubjects, () => api.teacherSubjects());
   const [message, setMessage] = useState("");
-  const [subjects, setSubjects] = useState<any[]>([]);
   const [form, setForm] = useState({ title: "", description: "", subject_id: "", section: "", due_date: "" });
 
-  function load() {
-    setLoading(true);
-    api.teacherAssignments().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const add = useMutation({
+    mutationFn: (payload: {
+      title: string;
+      description?: string;
+      subject_id: string;
+      section?: string;
+      due_date?: string;
+    }) => api.teacherAddAssignment(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Assignment added.");
+        setForm({ title: "", description: "", subject_id: "", section: "", due_date: "" });
+      } else {
+        setMessage(res.message || "Failed to add assignment");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherAssignments });
+      queryClient.invalidateQueries({ queryKey: qk.studentAssignments });
+    },
+  });
 
-  useEffect(() => {
-    load();
-    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherAddAssignment({
+    add.mutate({
       title: form.title,
       description: form.description || undefined,
       subject_id: form.subject_id,
       section: form.section || undefined,
       due_date: form.due_date || undefined,
     });
-    if (res.success) {
-      setMessage("Assignment added.");
-      setForm({ title: "", description: "", subject_id: "", section: "", due_date: "" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to add assignment");
-    }
   }
 
   return (
@@ -73,7 +77,7 @@ export default function TeacherAssignments() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td colSpan={4} className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-3">No assignments.</td></tr>

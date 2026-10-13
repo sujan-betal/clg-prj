@@ -1,49 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { qk, useApiQuery } from "@/lib/queries";
 
 export default function TeacherMarks() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending } = useApiQuery<any[]>(qk.teacherMarks, () => api.teacherMarks());
+  const { data: subjects = [] } = useApiQuery<any[]>(qk.teacherSubjects, () => api.teacherSubjects());
+  const { data: students = [] } = useApiQuery<any[]>(qk.teacherStudents, () => api.teacherStudents());
+  const { data: exams = [] } = useApiQuery<any[]>(qk.teacherExams, () => api.teacherExams());
   const [message, setMessage] = useState("");
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [exams, setExams] = useState<any[]>([]);
   const [form, setForm] = useState({ student_id: "", exam_id: "", subject_id: "", marks_obtained: "", marks_total: "" });
 
-  function load() {
-    setLoading(true);
-    api.teacherMarks().then((res) => {
-      if (res.success) setRows(res.data || []);
-      setLoading(false);
-    });
-  }
+  const add = useMutation({
+    mutationFn: (payload: {
+      student_id: string;
+      exam_id: string;
+      subject_id: string;
+      marks_obtained: number;
+      marks_total: number;
+    }) => api.teacherAddMarks(payload),
+    onSuccess: (res) => {
+      if (res.success) {
+        setMessage("Marks added.");
+        setForm({ student_id: "", exam_id: "", subject_id: "", marks_obtained: "", marks_total: "" });
+      } else {
+        setMessage(res.message || "Failed to add marks");
+      }
+      queryClient.invalidateQueries({ queryKey: qk.teacherMarks });
+    },
+  });
 
-  useEffect(() => {
-    load();
-    api.teacherSubjects().then((res) => res.success && setSubjects(res.data || []));
-    api.teacherStudents().then((res) => res.success && setStudents(res.data || []));
-    api.teacherExams().then((res) => res.success && setExams(res.data || []));
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const res = await api.teacherAddMarks({
+    add.mutate({
       student_id: form.student_id,
       exam_id: form.exam_id,
       subject_id: form.subject_id,
       marks_obtained: Number(form.marks_obtained),
       marks_total: Number(form.marks_total),
     });
-    if (res.success) {
-      setMessage("Marks added.");
-      setForm({ student_id: "", exam_id: "", subject_id: "", marks_obtained: "", marks_total: "" });
-      load();
-    } else {
-      setMessage(res.message || "Failed to add marks");
-    }
   }
 
   const columns = [
@@ -96,7 +95,7 @@ export default function TeacherMarks() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isPending ? (
               <tr><td className="px-4 py-3">Loading...</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-3">No marks records.</td></tr>

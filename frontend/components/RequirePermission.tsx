@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { hasPermission, PERMS_UPDATED_EVENT } from "@/lib/api";
+import { useHasPermission } from "@/lib/auth-store";
+import { PERMS_UPDATED_EVENT } from "@/lib/api";
 
 // Re-render the caller whenever permissions are refreshed from the server.
 export function usePermissionRefresh() {
@@ -26,7 +27,7 @@ export default function RequirePermission({
 }) {
   usePermissionRefresh();
   const codes = Array.isArray(permission) ? permission : [permission];
-  const allowed = codes.some((c) => hasPermission(c));
+  const allowed = useHasPermission(codes);
 
   if (!allowed) {
     return (
